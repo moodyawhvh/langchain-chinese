@@ -1,110 +1,114 @@
-# Global development guidelines for the LangChain monorepo
+# LangChain monorepo 全局开发指南
 
-This document provides context to understand the LangChain Python project and assist with development.
+> 🌐 本文档由 [langchain-ai/langchain](https://github.com/langchain-ai/langchain) 翻译,英文原版见原项目。
+>
+> ⚠️ 原文超过 10000 字符,本页翻译核心章节;CI/LangSmith 等长尾细节做了精简,完整内容见英文原版。代码块与链接保持原样。
+
+本文档提供理解 LangChain Python 项目所需的背景,并协助开发工作。
 
 <corridor>
 
-## Corridor security analysis
+## Corridor 安全分析
 
-When Corridor's `analyzePlan` tool is available, create a plan and use the tool to analyze it before generating or modifying code. Apply the resulting security guidance before writing code.
+当 Corridor 的 `analyzePlan` 工具可用时,先制定计划并在生成或修改代码前用该工具分析;写代码前先落实其给出的安全建议。
 
 </corridor>
 
-## Project architecture and context
+## 项目架构与背景
 
-### Monorepo structure
+### Monorepo 结构
 
-This is a Python monorepo with multiple independently versioned packages that use `uv`.
+这是一个使用 `uv` 的 Python monorepo,包含多个独立版本化的包。
 
 ```txt
 langchain/
 ├── libs/
-│   ├── core/             # `langchain-core` primitives and base abstractions
-│   ├── langchain/        # `langchain-classic` (legacy, no new features)
-│   ├── langchain_v1/     # Actively maintained `langchain` package
-│   ├── partners/         # Third-party integrations
-│   │   ├── openai/       # OpenAI models and embeddings
-│   │   ├── anthropic/    # Anthropic (Claude) integration
-│   │   ├── ollama/       # Local model support
-│   │   └── ... (other integrations maintained by the LangChain team)
-│   ├── text-splitters/   # Document chunking utilities
-│   ├── standard-tests/   # Shared test suite for integrations
-│   ├── model-profiles/   # Model configuration profiles
-├── .github/              # CI/CD workflows and templates
-├── .vscode/              # VSCode IDE standard settings and recommended extensions
-└── README.md             # Information about LangChain
+│   ├── core/             # `langchain-core` 原语与基础抽象
+│   ├── langchain/        # `langchain-classic`(遗留,不加新功能)
+│   ├── langchain_v1/     # 积极维护的 `langchain` 包
+│   ├── partners/         # 第三方集成
+│   │   ├── openai/       # OpenAI 模型与 embeddings
+│   │   ├── anthropic/    # Anthropic (Claude) 集成
+│   │   ├── ollama/       # 本地模型支持
+│   │   └── ...(LangChain 团队维护的其他集成)
+│   ├── text-splitters/   # 文档分块工具
+│   ├── standard-tests/   # 集成共享测试套件
+│   ├── model-profiles/   # 模型配置画像
+├── .github/              # CI/CD 工作流与模板
+├── .vscode/              # VSCode 标准配置与推荐扩展
+└── README.md             # LangChain 项目信息
 ```
 
-- **Core layer** (`langchain-core`): Base abstractions, interfaces, and protocols. Users should not need to know about this layer directly.
-- **Implementation layer** (`langchain`): Concrete implementations and high-level public utilities
-- **Integration layer** (`partners/`): Third-party service integrations. Note that this monorepo is not exhaustive of all LangChain integrations; some are maintained in separate repos, such as `langchain-ai/langchain-google` and `langchain-ai/langchain-aws`. Usually these repos are cloned at the same level as this monorepo, so if needed, you can refer to their code directly by navigating to `../langchain-google/` from this monorepo.
-- **Testing layer** (`standard-tests/`): Standardized integration tests for partner integrations
+- **核心层**(`langchain-core`):基础抽象、接口与协议。用户通常不需要直接接触这一层。
+- **实现层**(`langchain`):具体实现与高层公共工具。
+- **集成层**(`partners/`):第三方服务集成。注意本 monorepo 并未涵盖所有 LangChain 集成;部分集成在独立仓库维护,例如 `langchain-ai/langchain-google` 与 `langchain-ai/langchain-aws`。这些仓库通常与本 monorepo 克隆在同一层级,需要时可直接浏览 `../langchain-google/` 引用其代码。
+- **测试层**(`standard-tests/`):面向 partner 集成的标准化集成测试。
 
-### Development tools & commands
+### 开发工具与命令
 
-- `uv` – Fast Python package installer and resolver (replaces pip/poetry)
-- `make` – Task runner for common development commands. Feel free to look at the `Makefile` for available commands and usage patterns.
-- `ruff` – Fast Python linter and formatter
-- `mypy` – Static type checking
-- `pytest` – Testing framework
+- `uv` – 快速的 Python 包安装与依赖解析器(替代 pip/poetry)
+- `make` – 常用开发命令的任务执行器,可用命令见各 `Makefile`
+- `ruff` – 快速的 Python linter 与格式化工具
+- `mypy` – 静态类型检查
+- `pytest` – 测试框架
 
-This monorepo uses `uv` for dependency management. Local development uses editable installs: `[tool.uv.sources]`
+本 monorepo 用 `uv` 管理依赖,本地开发采用可编辑安装:`[tool.uv.sources]`。
 
-Each package in `libs/` has its own `pyproject.toml` and `uv.lock`.
+`libs/` 下每个包都有自己的 `pyproject.toml` 和 `uv.lock`。
 
-Before running your tests, set up all packages by running:
+跑测试前,先执行以下命令配置所有包:
 
 ```bash
-# For all groups
+# 所有依赖组
 uv sync --all-groups
 
-# or, to install a specific group only:
+# 或只装某一组:
 uv sync --group test
 ```
 
 ```bash
-# Run unit tests (no network)
+# 运行单元测试(不联网)
 make test
 
-# Run specific test file
+# 运行指定测试文件
 uv run --group test pytest tests/unit_tests/test_specific.py
 ```
 
 ```bash
-# Lint code
+# Lint 检查
 make lint
 
-# Format code
+# 格式化
 make format
 
-# Type checking
+# 类型检查
 uv run --group lint mypy .
 ```
 
-#### Environment and dependency management
+#### 环境与依赖管理
 
-Use `uv` for all environment and dependency operations in this monorepo. Do not invoke `pip`, `poetry`, or `conda` directly.
+monorepo 中所有环境与依赖操作一律使用 `uv`,不要直接调用 `pip`、`poetry` 或 `conda`。
 
-- Let `uv` manage the interpreter and virtual environments — `uv sync` and `uv run` operate without manual `source .venv/bin/activate`. Do not create ad-hoc virtual environments outside the package directory.
-- Each package targets its own supported Python range via its `pyproject.toml`; do not pin a global Python version. If you need an interpreter explicitly, defer to the package's `requires-python` rather than assuming system Python.
-- Install dependencies explicitly through `uv sync` (optionally `--group <name>` / `--all-groups`); never let them install implicitly.
-- Don't mix environments within a session, and don't add new dependencies unless strictly required — when you do, justify them (recent releases/commits, adoption).
+- 让 `uv` 管理解释器和虚拟环境 —— `uv sync` 和 `uv run` 无需手动 `source .venv/bin/activate`。不要在包目录外随意建虚拟环境。
+- 每个包通过自己的 `pyproject.toml` 声明支持的 Python 范围;不要固定全局 Python 版本。需要指定解释器时,以包的 `requires-python` 为准,不要假设系统 Python。
+- 依赖一律通过 `uv sync`(可选 `--group <name>` / `--all-groups`)显式安装,绝不隐式安装。
+- 不要在同一会话中混用环境;非必要不加新依赖 —— 确需添加时,说明理由(近期发布/提交、采用情况)。
 
-#### Key config files
+#### 关键配置文件
 
-- pyproject.toml: Main workspace configuration with dependency groups
-- uv.lock: Locked dependencies for reproducible builds
-- Makefile: Development tasks
+- pyproject.toml:主工作区配置与依赖组
+- uv.lock:锁定依赖,保证构建可复现
+- Makefile:开发任务
 
-#### PR and commit titles
+#### PR 与提交标题
 
-Follow Conventional Commits. See `.github/workflows/pr_lint.yml` for allowed types and scopes. All titles must include a scope with no exceptions — even for the main `langchain` package.
+遵循 Conventional Commits。允许的类型与 scope 见 `.github/workflows/pr_lint.yml`。所有标题必须带 scope,无一例外 —— 主包 `langchain` 也不例外。
 
-- Start the text after `type(scope):` with a lowercase letter, unless the first word is a proper noun (e.g. `Azure`, `GitHub`, `OpenAI`) or a named entity (class, function, method, parameter, or variable name).
-- Wrap named entities in backticks so they render as code. Proper nouns are left unadorned.
-- Keep titles short and descriptive — save detail for the body.
+- `type(scope):` 之后的正文以小写字母开头,除非首词是专有名词(如 `Azure`、`GitHub`、`OpenAI`)或命名实体(类、函数、方法、参数或变量名)。
+- 命名实体用反引号包裹以代码样式渲染;专有名词不加修饰。
+- 标题简短达意 —— 细节留给正文。
 
-Examples:
+示例:
 
 ```txt
 feat(langchain): add new chat completion feature
@@ -114,15 +118,15 @@ feat(langchain): `ls_agent_type` tag on `create_agent` calls
 fix(openai): infer Azure chat profiles from model name
 ```
 
-#### Branch naming
+#### 分支命名
 
-Branches should be prefixed `<github-username>/<scope>/<short-description>`:
+分支前缀格式为 `<github-username>/<scope>/<short-description>`:
 
-- `<github-username>` — the author's GitHub login (e.g. `mdrxy`).
-- `<scope>` — the same scope used in the Conventional Commit title (`core`, `langchain`, partner name, `infra`, `docs`, etc.).
-- `<short-description>` — kebab-case, brief, no trailing slash.
+- `<github-username>` — 作者的 GitHub 用户名(如 `mdrxy`)。
+- `<scope>` — 与 Conventional Commit 标题一致的 scope(`core`、`langchain`、partner 名、`infra`、`docs` 等)。
+- `<short-description>` — kebab-case,简短,结尾不带斜杠。
 
-Examples:
+示例:
 
 ```txt
 mdrxy/anthropic/normalize-tool-call-ids
@@ -130,53 +134,53 @@ mdrxy/core/vector-store-type-hints
 mdrxy/infra/agents-md-branch
 ```
 
-#### PR descriptions
+#### PR 描述
 
-The description *is* the summary — do not add a `# Summary` header.
+描述本身就是摘要 —— 不要再加 `# Summary` 标题。
 
-- When the PR closes an issue, lead with the closing keyword on its own line at the very top, followed by a horizontal rule and then the body:
+- 当 PR 关闭某个 issue 时,最顶部单独一行写关闭关键词,然后是水平分隔线和正文:
 
   ```txt
   Closes #123
 
   ---
 
-  <rest of description>
+  <其余描述>
   ```
 
-  Only `Closes`, `Fixes`, and `Resolves` auto-close the referenced issue on merge. `Related:` or similar labels are informational and do not close anything.
+  只有 `Closes`、`Fixes`、`Resolves` 会在合并时自动关闭对应 issue;`Related:` 等标注仅作信息说明,不会关闭任何东西。
 
-- Explain the *why*: who benefits, what problem they had, and how this solves it. Prefer a simple user story over a long summary.
-- Write for readers who may be unfamiliar with this area of the codebase. Avoid insider shorthand and prefer language that is friendly to public viewers — this aids interpretability.
-- Do **not** cite line numbers; they go stale as soon as the file changes.
-- Rarely include full file paths or filenames. Reference the affected symbol, class, or subsystem by name instead.
-- Wrap class, function, method, parameter, and variable names in backticks.
-- For net new features or behavior-changing bugfixes, PR descriptions should include a `## Release note` section that states the user-visible change in release-note-ready language.
-- Skip dedicated "Test plan" or "Testing" sections in most cases. Mention tests only when coverage is non-obvious, risky, or otherwise notable.
-- Call out areas of the change that require careful review.
-- Add a brief disclaimer noting AI-agent involvement in the contribution.
+- 解释"为什么":谁受益、遇到什么问题、如何解决。比起冗长摘要,更推荐简洁的用户故事。
+- 为可能不熟悉该领域的读者写作。避免圈内黑话,用语对公众友好 —— 有助于可读性。
+- **不要**引用行号;文件一改行号就失效。
+- 尽量不贴完整文件路径或文件名,改为按名称引用受影响的符号、类或子系统。
+- 类、函数、方法、参数和变量名用反引号包裹。
+- 对于全新功能或改变行为的 bugfix,PR 描述应包含 `## Release note` 小节,用发布说明口吻陈述用户可见的变化。
+- 多数情况下无需单独的"Test plan"/"Testing"小节;仅当测试覆盖不明显、有风险或值得说明时才提测试。
+- 指出本次改动中需要重点评审的部分。
+- 附一句简短声明,说明本贡献有 AI 智能体参与。
 
-## Core development principles
+## 核心开发原则
 
-### Maintain stable public interfaces
+### 保持公共接口稳定
 
-CRITICAL: Always attempt to preserve function signatures, argument positions, and names for exported/public methods. Do not make breaking changes.
-You should warn the developer for any function signature changes, regardless of whether they look breaking or not.
+关键:导出/公共方法务必保持函数签名、参数位置与名称,不做破坏性变更。
+任何函数签名变更都要向开发者示警,无论看起来是否具有破坏性。
 
-**Before making ANY changes to public APIs:**
+**修改任何公共 API 之前:**
 
-- Check if the function/class is exported in `__init__.py`
-- Look for existing usage patterns in tests and examples
-- Use keyword-only arguments for new parameters: `*, new_param: str = "default"`
-- Mark experimental features clearly with docstring warnings (using MkDocs Material admonitions, like `!!! warning`)
+- 确认函数/类是否在 `__init__.py` 中导出
+- 查看测试和示例中的既有用法
+- 新参数使用仅限关键字参数:`*, new_param: str = "default"`
+- 实验性特性用 docstring 警告明确标注(使用 MkDocs Material 提示块,如 `!!! warning`)
 
-Ask: "Would this change break someone's code if they used it last week?"
+自问:"这个改动会不会让上周还在用旧版的用户代码挂掉?"
 
-### Code quality standards
+### 代码质量标准
 
-All Python code MUST include type hints and return types.
+所有 Python 代码必须带类型标注和返回类型。
 
-```python title="Example"
+```python title="示例"
 def filter_unknown_users(users: list[str], known_users: set[str]) -> list[str]:
     """Single line description of the function.
 
@@ -191,41 +195,41 @@ def filter_unknown_users(users: list[str], known_users: set[str]) -> list[str]:
     """
 ```
 
-- Use descriptive, self-explanatory variable names.
-- Follow existing patterns in the codebase you're modifying
-- Attempt to break up complex functions (>20 lines) into smaller, focused functions where it makes sense
+- 变量命名要有描述性、见名知义。
+- 遵循你所改代码库中的既有模式。
+- 在合理的情况下,把复杂函数(>20 行)拆成更小、职责单一的函数。
 
-### Testing requirements
+### 测试要求
 
-Every new feature or bugfix MUST be covered by unit tests.
+每个新功能或 bugfix 必须有单元测试覆盖。
 
-- Unit tests: `tests/unit_tests/` (no network calls allowed)
-- Integration tests: `tests/integration_tests/` (network calls permitted)
-- We use `pytest` as the testing framework; if in doubt, check other existing tests for examples.
-- The testing file structure should mirror the source code structure.
+- 单元测试:`tests/unit_tests/`(禁止网络调用)
+- 集成测试:`tests/integration_tests/`(允许网络调用)
+- 测试框架为 `pytest`;拿不准时参考已有测试。
+- 测试文件结构应与源码结构镜像对应。
 
-**Checklist:**
+**清单:**
 
-- [ ] Tests fail when your new logic is broken
-- [ ] Happy path is covered
-- [ ] Edge cases and error conditions are tested
-- [ ] Use fixtures/mocks for external dependencies
-- [ ] Tests are deterministic (no flaky tests)
-- [ ] Does the test suite fail if your new logic is broken?
+- [ ] 新逻辑被故意破坏时测试会失败
+- [ ] 覆盖正常路径
+- [ ] 覆盖边界情况与错误场景
+- [ ] 对外部依赖使用 fixture/mock
+- [ ] 测试确定性(无 flaky 测试)
+- [ ] 测试套件能否捕获新逻辑被破坏的情况?
 
-### Security and risk assessment
+### 安全与风险评估
 
-- No `eval()`, `exec()`, or `pickle` on user-controlled input
-- Proper exception handling (no bare `except:`) and use a `msg` variable for error messages
-- Remove unreachable/commented code before committing
-- Race conditions or resource leaks (file handles, sockets, threads).
-- Ensure proper resource cleanup (file handles, connections)
+- 禁止对用户可控输入使用 `eval()`、`exec()` 或 `pickle`
+- 正确的异常处理(不用裸 `except:`),错误信息用 `msg` 变量
+- 提交前删除不可达/被注释的代码
+- 留意竞态条件与资源泄漏(文件句柄、套接字、线程)
+- 确保资源正确清理(文件句柄、连接)
 
-### Documentation standards
+### 文档标准
 
-Use Google-style docstrings with Args section for all public functions.
+所有公共函数使用 Google 风格 docstring,带 Args 小节。
 
-```python title="Example"
+```python title="示例"
 def send_email(to: str, msg: str, *, priority: str = "normal") -> bool:
     """Send an email to a recipient with specified priority.
 
@@ -245,141 +249,135 @@ def send_email(to: str, msg: str, *, priority: str = "normal") -> bool:
     """
 ```
 
-- Types go in function signatures, NOT in docstrings
-  - If a default is present, DO NOT repeat it in the docstring unless there is post-processing or it is set conditionally.
-- Focus on "why" rather than "what" in descriptions
-- Document all parameters, return values, and exceptions
-- Keep descriptions concise but clear
-- Ensure American English spelling (e.g., "behavior", not "behaviour")
-- Do NOT use Sphinx-style double backtick formatting (` ``code`` `). Use single backticks (`` `code` ``) for inline code references in docstrings and comments.
+- 类型写在函数签名里,不写进 docstring
+  - 有默认值时,除非有后处理或按条件赋值,否则不要在 docstring 里重复默认值。
+- 描述聚焦"为什么"而非"是什么"
+- 写全参数、返回值与异常
+- 描述简洁而清晰
+- 使用美式英语拼写(如 "behavior" 而非 "behaviour")
+- 不要用 Sphinx 风格的双反引号(`` ``code`` ``);docstring 和注释中的行内代码用单反引号(` `code` `)。
 
-#### Model references in docs and examples
+#### 文档与示例中的模型引用
 
-Always use the latest generally available (GA) models when referencing LLMs in docstrings and illustrative code snippets. Avoid preview or beta identifiers unless the model has no GA equivalent. Outdated model names signal stale code and confuse users.
+docstring 和示例代码中引用 LLM 时,一律使用最新的正式发布(GA)模型。除非该模型没有 GA 等价物,避免使用预览版或 beta 标识。过时的模型名会显得代码陈旧,也会让用户困惑。
 
-Before writing or updating model references, verify current model IDs against the provider's official docs. Do not rely on memorized or cached model names — they go stale quickly.
+写或改模型引用前,先对照供应商官方文档核实当前模型 ID。不要依赖记忆或缓存的模型名 —— 它们很快过时。
 
-Changing **shipped default parameter values** in code (e.g., a `model=` kwarg default in a class constructor) may constitute a breaking change — see "Maintain stable public interfaces" above. This guidance applies to documentation and examples, not code defaults.
+修改代码中**已发布的默认参数值**(如类构造器里 `model=` kwarg 的默认值)可能构成破坏性变更 —— 见上文"保持公共接口稳定"。此条针对文档与示例,不涉及代码默认值。
 
-For model *profile data* (capability flags, context windows), use the `langchain-profiles` CLI described below.
+模型*画像数据*(能力标志、上下文窗口)请使用下述 `langchain-profiles` CLI。
 
-## Model profiles
+## 模型画像
 
-Model profiles are generated using the `langchain-profiles` CLI in `libs/model-profiles`. The `--data-dir` must point to the directory containing `profile_augmentations.toml`, not the top-level package directory.
+模型画像用 `libs/model-profiles` 中的 `langchain-profiles` CLI 生成。`--data-dir` 必须指向包含 `profile_augmentations.toml` 的目录,而不是包的顶层目录。
 
 ```bash
-# Run from libs/model-profiles
+# 在 libs/model-profiles 下运行
 cd libs/model-profiles
 
-# Refresh profiles for a partner in this repo
+# 刷新本仓库内某 partner 的画像
 uv run langchain-profiles refresh --provider openai --data-dir ../partners/openai/langchain_openai/data
 
-# Refresh profiles for a partner in an external repo (requires echo y to confirm)
+# 刷新外部仓库中某 partner 的画像(需要 echo y 确认)
 echo y | uv run langchain-profiles refresh --provider google --data-dir /path/to/langchain-google/libs/genai/langchain_google_genai/data
 ```
 
-Example partners with profiles in this repo:
+本仓库内有画像的 partner 示例:
 
-- `libs/partners/openai/langchain_openai/data/` (provider: `openai`)
-- `libs/partners/anthropic/langchain_anthropic/data/` (provider: `anthropic`)
-- `libs/partners/perplexity/langchain_perplexity/data/` (provider: `perplexity`)
+- `libs/partners/openai/langchain_openai/data/`(provider: `openai`)
+- `libs/partners/anthropic/langchain_anthropic/data/`(provider: `anthropic`)
+- `libs/partners/perplexity/langchain_perplexity/data/`(provider: `perplexity`)
 
-The `echo y |` pipe is required when `--data-dir` is outside the `libs/model-profiles` working directory.
+当 `--data-dir` 位于 `libs/model-profiles` 工作目录之外时,必须加 `echo y |` 管道。
 
-## CI/CD infrastructure
+## CI/CD 基础设施
 
-### Release process
+### 发布流程
 
-Each partner package is released independently. The full flow is:
+每个 partner 包独立发布。完整流程:
 
-1. **Version bump PR.** Create a PR that bumps three files by one line each:
+1. **版本号 PR。** 创建一个 PR,各改一行:
    - `langchain_<partner>/_version.py` — `__version__`
    - `pyproject.toml` — `version`
-   - `uv.lock` — run `uv lock` from the package directory. If the diff includes unrelated changes (e.g. environment-dependent marker lines from a different local Python version), revert them and keep only the `version = "..."` line for the package being released
+   - `uv.lock` — 在包目录运行 `uv lock`。若 diff 含无关变化(例如不同本地 Python 版本导致的环境标记行),回退它们,只保留本次发布包的 `version = "..."` 行
 
-   Title follows Conventional Commits: `release(<partner>): <version>` (e.g. `release(openrouter): 0.2.6`). Use the branch name `release/<partner>-<version>`.
+   标题遵循 Conventional Commits:`release(<partner>): <version>`(如 `release(openrouter): 0.2.6`)。分支名用 `release/<partner>-<version>`。
 
-   Patch vs. minor bump follows in-repo precedent: within a `0.x` series, fixes and additive features get a patch bump (e.g. `session_id` field → 0.2.1→0.2.2, `parallel_tool_calls` → 0.2.3→0.2.4).
+   补丁号还是次版本号按仓库既有惯例:在 `0.x` 系列内,修复与新增功能都走补丁号(如 `session_id` 字段 → 0.2.1→0.2.2,`parallel_tool_calls` → 0.2.3→0.2.4)。
 
-2. **Merge the PR** to `master`.
+2. **合并 PR** 到 `master`。
 
-3. **Trigger the release workflow.** Run `gh workflow run` against the "🚀 Package Release" workflow (`_release.yml`, file ID `63880841`):
+3. **触发发布工作流。** 对 "🚀 Package Release" 工作流(`_release.yml`,文件 ID `63880841`)执行 `gh workflow run`:
 
    ```bash
    gh workflow run 63880841 --repo langchain-ai/langchain \
      -f working-directory=<partner> -f release-version=<version>
    ```
 
-   `working-directory` is the short partner name from the workflow's dropdown (e.g. `openrouter`, not `libs/partners/openrouter`).
+   `working-directory` 用工作流下拉框里的 partner 短名(如 `openrouter`,不是 `libs/partners/openrouter`)。
 
-4. **The workflow handles everything else automatically** — do **not** create a GitHub release or tag manually. The `mark-release` job (using `ncipollo/release-action`) creates the GitHub release, tag, and release notes after PyPI publish succeeds. The release notes body is auto-generated from commit history between the previous tag and HEAD.
+4. **其余全部由工作流自动完成** —— **不要**手动创建 GitHub release 或 tag。PyPI 发布成功后,`mark-release` 任务(使用 `ncipollo/release-action`)会创建 GitHub release、tag 和发布说明;发布说明正文由上一个 tag 到 HEAD 之间的提交历史自动生成。
 
-   Monitor the run:
+   监控运行:
 
    ```bash
    gh run view <run-id> --repo langchain-ai/langchain
    ```
 
-   The full job chain is: build → release-notes → pre-release-checks → TestPyPI publish → PyPI publish → tag GitHub release.
+   完整任务链:build → release-notes → pre-release-checks → TestPyPI publish → PyPI publish → tag GitHub release。
 
-### PR labeling and linting
+### PR 标签与 lint
 
-**Title linting** (`.github/workflows/pr_lint.yml`)
+**标题 lint**(`.github/workflows/pr_lint.yml`)
 
-**Auto-labeling:**
+**自动打标:**
 
-- `.github/workflows/pr_labeler.yml` – Unified PR labeler (size, file, title, external/internal, contributor tier)
-- `.github/workflows/pr_labeler_backfill.yml` – Manual backfill of PR labels on open PRs
-- `.github/workflows/auto-label-by-package.yml` – Issue labeling by package
-- `.github/workflows/tag-external-issues.yml` – Issue external/internal classification
+- `.github/workflows/pr_labeler.yml` – 统一 PR 打标器(规模、文件、标题、外部/内部、贡献者层级)
+- `.github/workflows/pr_labeler_backfill.yml` – 对已开 PR 手动补打标签
+- `.github/workflows/auto-label-by-package.yml` – 按 package 给 issue 打标
+- `.github/workflows/tag-external-issues.yml` – issue 外部/内部分类
 
-### Integration test tracing (LangSmith)
+### 集成测试追踪(LangSmith)
 
-Scheduled and manually dispatched integration tests (`integration_tests.yml`) trace every run to LangSmith so failures link back to the originating Actions run. (`_release.yml` runs integration tests too, but does not currently configure LangSmith tracing.)
+定时与手动触发的集成测试(`integration_tests.yml`)会把每次运行追踪到 LangSmith,失败可回链到发起的 Actions run。(`_release.yml` 也会跑集成测试,但目前未配置 LangSmith 追踪。)
 
-**Env vars set by CI:**
+CI 设置的环境变量包括 `LANGSMITH_API_KEY`(认证)、`LANGSMITH_TRACING: "true"`(开启追踪)、`LANGSMITH_PROJECT`(默认 `scheduled-testing-py`,可用仓库变量覆盖;改项目请改 GitHub 仓库变量,不要硬编码进工作流)、`LANGSMITH_TAGS`(标识本次运行的逗号分隔标签)和 `LANGSMITH_METADATA`(由 "Build LangSmith Metadata" 步骤构建的 JSON,含 run id、commit SHA 等)。
 
-- `LANGSMITH_API_KEY` — authenticates to LangSmith (repo secret, scoped to the "Scheduled testing" GitHub environment in `integration_tests.yml`).
-- `LANGSMITH_TRACING: "true"` — enables tracing for the test process.
-- `LANGSMITH_PROJECT` — the project traces are sent to. Defaults to `scheduled-testing-py` via a repo variable override: `${{ vars.LANGSMITH_PROJECT || 'scheduled-testing-py' }}`. To change the project, set the `LANGSMITH_PROJECT` repository variable in GitHub settings — do not hardcode it in the workflow.
-- `LANGSMITH_TAGS` — comma-separated tags identifying the run: `github-actions`, the matrix working directory (e.g. `libs/partners/openai`), the Python version, and the commit SHA.
-- `LANGSMITH_METADATA` — a JSON object built by the "Build LangSmith Metadata" step, containing `github_sha`, `github_run_id`, `github_run_attempt`, `github_run_url`, `github_workflow`, `github_event`, `github_ref`, `working_directory`, and `python_version`.
+**追踪桥接插件:** LangSmith SDK 原生并不从环境读取 `LANGSMITH_TAGS` / `LANGSMITH_METADATA`。`libs/standard-tests/langchain_tests/_langsmith_plugin.py` 的 pytest 插件补上了这一环:在整个测试会话期间进入 `langsmith.run_helpers.tracing_context`。它仅在 `GITHUB_ACTIONS=true` 时激活,本地开发不受影响;通过 `pytest11` 入口点在依赖 `langchain-tests` 的包中自动发现。
 
-**The tracing bridge plugin:** The LangSmith SDK does not natively read `LANGSMITH_TAGS` or `LANGSMITH_METADATA` from the environment. The pytest plugin at `libs/standard-tests/langchain_tests/_langsmith_plugin.py` bridges that gap by entering `langsmith.run_helpers.tracing_context` for the duration of the test session. It only activates when `GITHUB_ACTIONS=true`, so local development is unaffected. Auto-discovered via the `pytest11` entry point in any package that depends on `langchain-tests`.
+**单元测试隔离:** 单元测试绝不联网、不发追踪。`libs/core` Makefile 的 `make test` 用 `env -u` 在运行 pytest 前清除追踪变量(`LANGCHAIN_TRACING_V2`、`LANGCHAIN_API_KEY`、`LANGSMITH_API_KEY`、`LANGSMITH_TRACING`、`LANGCHAIN_PROJECT`)。此外,`libs/core/tests/unit_tests/runnables/conftest.py` 有会话级 autouse fixture,显式关闭 runnable 单元测试的追踪,结束后恢复原环境。
 
-**Unit test isolation:** Unit tests must never make network calls or send traces. The `make test` target in the `libs/core` Makefile uses `env -u` to unset the tracing vars (`LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`, `LANGSMITH_API_KEY`, `LANGSMITH_TRACING`, `LANGCHAIN_PROJECT`) before running pytest. Additionally, `libs/core/tests/unit_tests/runnables/conftest.py` has a session-scoped autouse fixture that explicitly disables tracing for runnable unit tests, restoring the original environment afterward.
+### 向 CI 接入新 partner
 
-### Adding a new partner to CI
+新增 partner 包时,更新以下文件:
 
-When adding a new partner package, update these files:
+- `.github/ISSUE_TEMPLATE/*.yml` – 加入 package 下拉选项
+- `.github/dependabot.yml` – 加入依赖更新条目
+- `.github/scripts/pr-labeler-config.json` – 加入文件规则和 scope→label 映射
+- `.github/workflows/_release.yml` – 按需加入 API key secret
+- `.github/workflows/auto-label-by-package.yml` – 加入包标签
+- `.github/workflows/check_diffs.yml` – 加入变更检测
+- `.github/workflows/integration_tests.yml` – 加入集成测试配置
+- `.github/workflows/pr_lint.yml` – 加入允许的 scope
 
-- `.github/ISSUE_TEMPLATE/*.yml` – Add to package dropdown
-- `.github/dependabot.yml` – Add dependency update entry
-- `.github/scripts/pr-labeler-config.json` – Add file rule and scope-to-label mapping
-- `.github/workflows/_release.yml` – Add API key secrets if needed
-- `.github/workflows/auto-label-by-package.yml` – Add package label
-- `.github/workflows/check_diffs.yml` – Add to change detection
-- `.github/workflows/integration_tests.yml` – Add integration test config
-- `.github/workflows/pr_lint.yml` – Add to allowed scopes
+## GitHub Actions 与工作流
 
-## GitHub Actions & Workflows
+本仓库要求 action 固定到完整长度的 commit SHA;用 tag 会失败。用 `gh` CLI 查询,并确认不是需要解引用的附注 tag 对象。
 
-This repository require actions to be pinned to a full-length commit SHA. Attempting to use a tag will fail. Use the `gh` cli to query. Verify tags are not annotated tag objects (which would need dereferencing).
+## 附加资源
 
-## Additional resources
-
-- **Documentation:** https://docs.langchain.com/oss/python/langchain/overview and source at https://github.com/langchain-ai/docs or `../docs/`. Prefer the local install and use file search tools for best results. If needed, use the docs MCP server as defined in `.mcp.json` for programmatic access.
-- **Contributing Guide:** [Contributing Guide](https://docs.langchain.com/oss/python/contributing/overview)
+- **文档:** https://docs.langchain.com/oss/python/langchain/overview ,源码在 https://github.com/langchain-ai/docs 或 `../docs/`。优先本地安装并用文件搜索工具;必要时按 `.mcp.json` 的定义使用 docs MCP 服务器以编程方式访问。
+- **贡献指南:** [Contributing Guide](https://docs.langchain.com/oss/python/contributing/overview)
 
 <!-- OPENWIKI:START -->
 
 ## OpenWiki
 
-This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+本仓库有自动生成的 `openwiki/` 证据索引。它是可选的按需背景,不是必读的启动材料。
 
-- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
-- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+- 以源码和测试为准。简报中的未知项与评审项是待验证缺口,不是自动生效的要求。
+- 优先选择能证明所改行为的最小静默验证;保留完整的失败输出。
 
-The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+定时的 OpenWiki GitHub Actions 工作流会刷新仓库 wiki。除非明确要求,不要手改生成的 OpenWiki 页面;优先更新源码/文档,让 OpenWiki 重新生成。
 
 <!-- OPENWIKI:END -->
