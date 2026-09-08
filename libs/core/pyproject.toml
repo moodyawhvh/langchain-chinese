@@ -83,7 +83,7 @@ typing = [
 # dev 组:本地开发辅助工具(Jupyter、打包工具、图布局库)
 dev = [
     "jupyter>=1.0.0,<2.0.0",
-    "setuptools>=67.6.1,<84.0.0",
+    "setuptools>=67.6.1,<85.0.0",
     "grandalf>=0.8.0,<1.0.0",
 ]
 # test 组:单元测试工具链
