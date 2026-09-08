@@ -46,47 +46,51 @@ sources:
 generated: { by: "openwiki/0.5.0", at: "2026-09-03T15:18:34.589Z" }
 ---
 
-## Welcome to LangChain Development
+> 🌐 本文档由 [langchain-ai/langchain](https://github.com/langchain-ai/langchain) 翻译,英文原版见原项目。
+>
+> ⚠️ 原文超过 10000 字符,本页翻译核心章节;命令、代码块与链接保持原样,完整细节请参考英文原版。
 
-LangChain is the agent engineering platform—a framework for building LLM-powered applications with composable abstractions, provider integrations, and orchestration primitives. This page guides you through the monorepo structure, essential setup, common dev tasks, and routing to deeper documentation.
+## 欢迎参与 LangChain 开发
 
-**New to the repo?** Start with [Installation & Setup](#installation--setup), then jump to [Quick Navigation](#quick-navigation-to-major-areas) to find what you need to work on.
+LangChain 是一个智能体(agent)工程平台——一个用于构建 LLM 应用的框架,提供可组合的抽象、多家供应商集成以及编排原语。本页将带你了解 monorepo 结构、必要的环境搭建、常见开发任务,以及如何跳转到更深入的文档。
 
-## Monorepo Overview
+**初次接触本仓库?** 先看[安装与环境搭建](#安装与环境搭建),再通过[快速导航](#快速导航到主要领域)找到你要处理的内容。
 
-LangChain is organized as a **three-layer architecture** in `/libs/`:
+## Monorepo 总览
+
+LangChain 在 `/libs/` 下采用**三层架构**:
 
 ```
 /libs/
-├── core/              # langchain-core: Base abstractions (Runnable, BaseChatModel, tools, prompts, messages)
-├── langchain_v1/      # langchain: Agent orchestration, factory, middleware
-├── partners/          # Provider-specific integrations (OpenAI, Anthropic, Ollama, etc.)
-├── standard-tests/    # Shared test suites for component conformance
-├── text-splitters/    # Text splitting utilities
-├── model-profiles/    # LLM metadata and capability profiles
-└── Makefile           # Monorepo-level build targets
+├── core/              # langchain-core: 基础抽象(Runnable、BaseChatModel、tools、prompts、messages)
+├── langchain_v1/      # langchain: 智能体编排、工厂、中间件
+├── partners/          # 各供应商集成(OpenAI、Anthropic、Ollama 等)
+├── standard-tests/    # 组件一致性共享测试套件
+├── text-splitters/    # 文本切分工具
+├── model-profiles/    # LLM 元数据与能力画像
+└── Makefile           # monorepo 级构建目标
 ```
 
-### When to Edit Each Layer
+### 各层何时修改
 
-| Layer | Edit when you are... | Key files |
+| 层 | 适用场景 | 关键文件 |
 |-------|----------------------|-----------|
-| **core** | Adding or modifying base abstractions, core interfaces (Runnable, BaseChatModel, messages, tools, prompts), or callbacks. | `libs/core/langchain_core/` |
-| **langchain_v1** | Building agent factory features, middleware, model initialization, chat model selection, or high-level orchestration. | `libs/langchain_v1/langchain/agents/`, `libs/langchain_v1/langchain/chat_models/` |
-| **partners/{name}** | Adding a new LLM provider (OpenAI, Anthropic, etc.), model-specific features, or provider integrations. | `libs/partners/{provider}/` |
+| **core** | 新增或修改基础抽象、核心接口(Runnable、BaseChatModel、messages、tools、prompts)或回调。 | `libs/core/langchain_core/` |
+| **langchain_v1** | 开发智能体工厂功能、中间件、模型初始化、聊天模型选择或高层编排。 | `libs/langchain_v1/langchain/agents/`、`libs/langchain_v1/langchain/chat_models/` |
+| **partners/{name}** | 接入新的 LLM 供应商(OpenAI、Anthropic 等)、模型特性或供应商集成。 | `libs/partners/{provider}/` |
 
-## Installation & Setup
+## 安装与环境搭建
 
-### Clone the Repository
+### 克隆仓库
 
 ```bash
 git clone https://github.com/langchain-ai/langchain.git
 cd langchain
 ```
 
-### Install Dependencies with `uv`
+### 用 `uv` 安装依赖
 
-The monorepo uses `uv` for fast, deterministic dependency resolution. Install it once:
+monorepo 使用 `uv` 进行快速、确定的依赖解析。先安装一次:
 
 ```bash
 # macOS / Linux
@@ -95,225 +99,225 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Windows
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# Or via Homebrew
+# 或通过 Homebrew
 brew install uv
 ```
 
-Then sync all dependencies in your package:
+然后同步你所在包的全部依赖:
 
 ```bash
-# From any libs/ subdirectory, install all groups (test, lint, type, dev)
+# 在任意 libs/ 子目录下,安装所有依赖组(test、lint、type、dev)
 uv sync --all-groups
 
-# Or install only what you need
-uv sync --group test     # For running tests
-uv sync --group lint     # For ruff/mypy
+# 或只装需要的部分
+uv sync --group test     # 运行测试用
+uv sync --group lint     # ruff/mypy 用
 ```
 
-### Pre-Commit Hooks
+### Pre-Commit 钩子
 
-Install git hooks to enforce code quality automatically:
+安装 git 钩子,自动保证代码质量:
 
 ```bash
 pre-commit install
 
-# To manually run all hooks
+# 手动运行所有钩子
 pre-commit run --all-files
 
-# To run a specific hook
+# 只运行某个钩子
 pre-commit run ruff --all-files
 ```
 
-Pre-commit hooks run:
-- YAML/TOML syntax validation
-- Text normalization and trailing whitespace fixes
-- **Per-package formatting and linting** (ruff, mypy)
-- **Version consistency checks** across `pyproject.toml` files
+Pre-commit 钩子会执行:
+- YAML/TOML 语法校验
+- 文本规范化与行尾空白清理
+- **按包粒度的格式化和 lint**(ruff、mypy)
+- 各 `pyproject.toml` 之间的**版本一致性检查**
 
-## Common Development Tasks
+## 常见开发任务
 
-### Run Unit Tests
+### 运行单元测试
 
 ```bash
-# From any package directory (libs/core, libs/langchain_v1, etc.)
+# 在任意包目录下(libs/core、libs/langchain_v1 等)
 make test
 
-# Run a specific test file
+# 运行指定测试文件
 make test TEST_FILE=tests/unit_tests/agents/test_factory.py
 
-# Run tests in watch mode (auto-rerun on file changes)
+# 监视模式(文件变更自动重跑)
 make test_watch
 
-# Run extended tests (marked @pytest.mark.requires)
+# 运行扩展测试(带 @pytest.mark.requires 标记)
 make extended_tests
 ```
 
-**Key details:**
-- Tests run with **socket restrictions** (`--disable-socket`) to prevent accidental network calls
-- Tests run **in parallel** via pytest-xdist (`-n auto`)
-- LangSmith tracing variables are unset to keep tests isolated
-- Typical test path mirrors source: `langchain_core/runnables/base.py` → `tests/unit_tests/runnables/test_base.py`
+**要点:**
+- 测试默认带**套接字限制**(`--disable-socket`),防止意外联网
+- 通过 pytest-xdist **并行执行**(`-n auto`)
+- 会清除 LangSmith 追踪变量,保证测试隔离
+- 测试路径与源码对应:`langchain_core/runnables/base.py` → `tests/unit_tests/runnables/test_base.py`
 
-### Format and Lint
+### 格式化与 Lint
 
 ```bash
-# Format all Python files (ruff)
+# 格式化所有 Python 文件(ruff)
 make format
 
-# Check linting issues (ruff, mypy)
+# 检查 lint 问题(ruff、mypy)
 make lint
 
-# Type checking only (mypy)
+# 仅类型检查(mypy)
 make type
 
-# Format only changed files (git diff against main)
+# 只格式化变更文件(与 main 做 git diff)
 make format_diff
 ```
 
-**Tools used:**
-- **ruff**: Fast Python linter and formatter (replaces black, isort, flake8)
-- **mypy**: Static type checker
-- Both are run via `uv run --group lint`
+**使用的工具:**
+- **ruff**:快速的 Python linter 和格式化工具(替代 black、isort、flake8)
+- **mypy**:静态类型检查器
+- 两者都通过 `uv run --group lint` 运行
 
-### Full Local Validation
+### 提 PR 前的完整本地校验
 
-Run this before pushing a PR:
+在推送 PR 之前运行:
 
 ```bash
-# From your package directory
+# 在你的包目录下
 make format && make lint && make test
 ```
 
-Or in one line:
+或一行搞定:
 
 ```bash
 cd libs/core && make format lint test
 ```
 
-## Quick Navigation to Major Areas
+## 快速导航到主要领域
 
-Use the table below to route to detailed documentation:
+用下面的表路由到详细文档:
 
-| Task | Start Here | Key Concepts |
+| 任务 | 从这里开始 | 关键概念 |
 |------|-----------|--------------|
-| **Build an agent** | [Agent Factory](/openwiki/agent-factory.md) | create_agent, AgentState, middleware composition, graph execution |
-| **Add a new LLM provider** | [Adding a Chat Model Provider](/openwiki/partner-pattern.md) | ChatModel impl, message conversion, provider registration, standard tests |
-| **Understand the architecture** | [Architecture Overview](/openwiki/architecture.md) | Three-layer design, dependency flow, core vs. orchestration vs. partners |
-| **Work with chat models** | [Chat Model Interface](/openwiki/chat-models.md) | BaseChatModel protocol, streaming, tool binding, structured output |
-| **Initialize models dynamically** | [Model Initialization](/openwiki/model-initialization.md) | init_chat_model factory, provider:model syntax, fallback chains |
-| **Compose components (chains, pipelines)** | [Runnables & Composability](/openwiki/runnables.md), [Composability](/openwiki/composability.md) | Runnable protocol, \| operator, branching, retry, fallback |
-| **Work with tools** | [Tools](/openwiki/tools.md) | BaseTool, schema generation, tool calling, result handling |
-| **Stream responses** | [Streaming](/openwiki/streaming.md) | Token-by-token output, streaming across components |
-| **Enforce response formats** | [Structured Output](/openwiki/structured-output.md) | JSON schemas, response validation, typed outputs |
-| **Write middleware** | [Agent Middleware](/openwiki/middleware.md) | Middleware types, composition, custom hooks |
-| **Trace agent execution** | [Agent Execution Flow](/openwiki/agent-execution.md) | Runtime lifecycle, loop control, state transitions |
-| **Add observability** | [Callbacks & Tracing](/openwiki/callbacks.md) | Callback manager, LangSmith integration, logging |
-| **Write unit/integration tests** | [Unit Testing](/openwiki/unit-tests.md), [Integration Testing](/openwiki/integration-tests.md) | Test structure, fixtures, mocking, VCR cassettes |
-| **Work with prompts** | [Prompts](/openwiki/prompts.md) | Templates, few-shot, variables, image handling |
-| **Understand message types** | [Messages](/openwiki/messages.md) | AIMessage, ToolMessage, content blocks, provider conversion |
-| **Use Model Context Protocol** | [MCP Integration](/openwiki/mcp-integration.md) | MCP servers, tool adapters, elicitation |
-| **Reference all file paths** | [Source Map](/openwiki/source-map.md) | Concept-to-path lookup table, directory structure |
-| **Check CI/CD workflows** | [CI/CD Workflows](/openwiki/ci-workflows.md) | GitHub Actions, testing, linting, release process |
-| **Development command reference** | [Dev Commands](/openwiki/dev-commands.md) | Detailed make targets, uv syntax, env setup |
+| **构建智能体** | [Agent Factory](/openwiki/agent-factory.md) | create_agent、AgentState、中间件组合、图执行 |
+| **新增 LLM 供应商** | [Adding a Chat Model Provider](/openwiki/partner-pattern.md) | ChatModel 实现、消息转换、供应商注册、标准测试 |
+| **理解架构** | [Architecture Overview](/openwiki/architecture.md) | 三层设计、依赖流向、core/编排/partners 分工 |
+| **使用聊天模型** | [Chat Model Interface](/openwiki/chat-models.md) | BaseChatModel 协议、流式、工具绑定、结构化输出 |
+| **动态初始化模型** | [Model Initialization](/openwiki/model-initialization.md) | init_chat_model 工厂、provider:model 语法、回退链 |
+| **组合组件(链、流水线)** | [Runnables & Composability](/openwiki/runnables.md)、[Composability](/openwiki/composability.md) | Runnable 协议、\| 运算符、分支、重试、回退 |
+| **使用工具** | [Tools](/openwiki/tools.md) | BaseTool、schema 生成、工具调用、结果处理 |
+| **流式输出** | [Streaming](/openwiki/streaming.md) | 逐 token 输出、跨组件流式传输 |
+| **约束响应格式** | [Structured Output](/openwiki/structured-output.md) | JSON schema、响应校验、类型化输出 |
+| **编写中间件** | [Agent Middleware](/openwiki/middleware.md) | 中间件类型、组合、自定义钩子 |
+| **追踪智能体执行** | [Agent Execution Flow](/openwiki/agent-execution.md) | 运行时生命周期、循环控制、状态迁移 |
+| **增加可观测性** | [Callbacks & Tracing](/openwiki/callbacks.md) | 回调管理器、LangSmith 集成、日志 |
+| **编写单元/集成测试** | [Unit Testing](/openwiki/unit-tests.md)、[Integration Testing](/openwiki/integration-tests.md) | 测试结构、fixture、mock、VCR cassette |
+| **使用提示词** | [Prompts](/openwiki/prompts.md) | 模板、few-shot、变量、图片处理 |
+| **理解消息类型** | [Messages](/openwiki/messages.md) | AIMessage、ToolMessage、内容块、供应商转换 |
+| **使用模型上下文协议** | [MCP Integration](/openwiki/mcp-integration.md) | MCP 服务器、工具适配器、elicitation |
+| **查阅所有文件路径** | [Source Map](/openwiki/source-map.md) | 概念到路径的速查表、目录结构 |
+| **查看 CI/CD 流程** | [CI/CD Workflows](/openwiki/ci-workflows.md) | GitHub Actions、测试、lint、发布流程 |
+| **开发命令参考** | [Dev Commands](/openwiki/dev-commands.md) | make 目标详解、uv 语法、环境搭建 |
 
-## Repository Structure at a Glance
+## 仓库结构速览
 
-### Root Level
+### 根目录
 
 ```
 /
-├── .github/              # GitHub Actions workflows (CI/CD)
-├── .pre-commit-config.yaml # Pre-commit hooks definition
-├── .vscode/              # VS Code settings
-├── libs/                 # Main monorepo workspace
-├── AGENTS.md             # Agent-focused documentation
-├── CLAUDE.md             # Contributing guide (READ THIS BEFORE PR)
-└── README.md             # Top-level project overview
+├── .github/              # GitHub Actions 工作流(CI/CD)
+├── .pre-commit-config.yaml # pre-commit 钩子定义
+├── .vscode/              # VS Code 配置
+├── libs/                 # monorepo 主工作区
+├── AGENTS.md             # 面向智能体的文档
+├── CLAUDE.md             # 贡献指南(提 PR 前必读)
+└── README.md             # 项目总览
 ```
 
-### Inside `/libs/`
+### `/libs/` 内部
 
-**core/** — Base abstractions (langchain-core package)
+**core/** — 基础抽象(langchain-core 包)
 ```
 core/
 ├── langchain_core/
-│   ├── language_models/  # BaseChatModel and language model contracts
-│   ├── messages/         # Message types and content blocks
-│   ├── runnables/        # Runnable protocol and operators
-│   ├── tools/            # BaseTool and tool utilities
-│   ├── prompts/          # Prompt templates and few-shot
-│   ├── callbacks/        # Callback manager and handlers
-│   └── output_parsers/   # Output parsing and validation
-├── tests/unit_tests/     # Unit tests (no network)
-├── tests/integration_tests/ # Integration tests (live APIs)
-├── Makefile              # Build targets (test, lint, format)
-└── pyproject.toml        # Package deps and metadata
+│   ├── language_models/  # BaseChatModel 与语言模型契约
+│   ├── messages/         # 消息类型与内容块
+│   ├── runnables/        # Runnable 协议与运算符
+│   ├── tools/            # BaseTool 与工具工具集
+│   ├── prompts/          # 提示词模板与 few-shot
+│   ├── callbacks/        # 回调管理器与处理器
+│   └── output_parsers/   # 输出解析与校验
+├── tests/unit_tests/     # 单元测试(不联网)
+├── tests/integration_tests/ # 集成测试(调用真实 API)
+├── Makefile              # 构建目标(test、lint、format)
+└── pyproject.toml        # 包依赖与元数据
 ```
 
-**langchain_v1/** — Agent orchestration (langchain package)
+**langchain_v1/** — 智能体编排(langchain 包)
 ```
 langchain_v1/
 ├── langchain/
 │   ├── agents/
-│   │   ├── factory.py    # create_agent function
-│   │   ├── middleware/   # Pluggable middleware hooks
-│   │   └── structured_output.py # Response schema
+│   │   ├── factory.py    # create_agent 函数
+│   │   ├── middleware/   # 可插拔中间件钩子
+│   │   └── structured_output.py # 响应 schema
 │   ├── chat_models/
-│   │   └── base.py       # init_chat_model factory
-│   ├── mcp/              # Model Context Protocol
+│   │   └── base.py       # init_chat_model 工厂
+│   ├── mcp/              # 模型上下文协议
 │   └── ...
 ├── tests/unit_tests/
 ├── tests/integration_tests/
-├── tests/cassettes/      # VCR cassettes for HTTP mocking
+├── tests/cassettes/      # 用于 HTTP mock 的 VCR cassette
 ├── Makefile
 └── pyproject.toml
 ```
 
-**partners/** — Provider integrations
+**partners/** — 供应商集成
 ```
 partners/
-├── openai/               # ChatOpenAI, embeddings
+├── openai/               # ChatOpenAI、embeddings
 ├── anthropic/            # ChatAnthropic (Claude)
-├── ollama/               # ChatOllama (local models)
+├── ollama/               # ChatOllama(本地模型)
 ├── groq/                 # ChatGroq
 ├── mistralai/            # ChatMistralAI
-├── huggingface/          # HuggingFace models/embeddings
+├── huggingface/          # HuggingFace 模型/embeddings
 ├── deepseek/             # ChatDeepSeek
-└── ... (20+ more providers)
+└── ...(20+ 个其他供应商)
 ```
 
-Each partner has the same structure:
+每个 partner 结构一致:
 ```
 provider/
 ├── langchain_{provider}/
-│   ├── __init__.py       # Exports ChatModel class
+│   ├── __init__.py       # 导出 ChatModel 类
 │   ├── chat_models/
-│   │   └── base.py       # ChatModel implementation
-│   └── data/             # Model profiles
+│   │   └── base.py       # ChatModel 实现
+│   └── data/             # 模型画像
 ├── tests/
-│   ├── unit_tests/       # Standard tests + custom
+│   ├── unit_tests/       # 标准测试 + 自定义测试
 │   └── integration_tests/
 ├── pyproject.toml
 ├── Makefile
 └── uv.lock
 ```
 
-## Your First PR: A Workflow
+## 你的第一个 PR:完整流程
 
-### 1. Pick a Task
+### 1. 挑任务
 
-Decide what you want to work on using the [Quick Navigation](#quick-navigation-to-major-areas) table above. For first-time contributors:
-- **Easy**: Add a test, fix a type error, improve documentation
-- **Medium**: Add a new middleware hook, extend a tool interface
-- **Hard**: Add a new provider integration (follow [Adding a Chat Model Provider](/openwiki/partner-pattern.md))
+用上面的[快速导航](#快速导航到主要领域)表决定要做什么。首次贡献者建议:
+- **简单**:加测试、修类型错误、改进文档
+- **中等**:新增中间件钩子、扩展工具接口
+- **困难**:新增供应商集成(参考 [Adding a Chat Model Provider](/openwiki/partner-pattern.md))
 
-### 2. Read the Contributing Guide
+### 2. 阅读贡献指南
 
-Before coding, read:
-- **[CLAUDE.md](repo://CLAUDE.md)** — Conventions, style, and PR expectations
-- **Relevant wiki page** — Deep context on your area (see table above)
+写代码前先读:
+- **[CLAUDE.md](repo://CLAUDE.md)** — 规范、风格与 PR 要求
+- **对应的 wiki 页面** — 你要改的领域的深入背景(见上表)
 
-### 3. Set Up Your Package
+### 3. 配置你的包
 
 ```bash
 cd libs/{core|langchain_v1|partners/provider}
@@ -321,111 +325,111 @@ uv sync --all-groups
 pre-commit install
 ```
 
-### 4. Make Your Changes
+### 4. 修改代码
 
-Follow the style and patterns you see in the codebase. Use type hints; write tests alongside code.
+遵循代码库中已有的风格与模式。写类型标注;代码与测试同步提交。
 
-### 5. Run Local Checks
+### 5. 本地检查
 
 ```bash
 make format lint test
 ```
 
-All checks must pass before pushing.
+全部通过后才能推送。
 
-### 6. Commit and Push
+### 6. 提交并推送
 
 ```bash
 git add .
-git commit -m "Brief description of change"
+git commit -m "简述本次改动"
 git push origin your-branch
 ```
 
-Pre-commit hooks will run automatically. If they fail, fix and commit again.
+pre-commit 钩子会自动运行。失败就修复后重新提交。
 
-### 7. Open a Pull Request
+### 7. 发起 Pull Request
 
-Link the PR to any relevant issue and reference the wiki pages you read in the description. The LangChain team will review and provide feedback.
+将 PR 关联到相关 issue,并在描述中引用你读过的 wiki 页面。LangChain 团队会评审并反馈。
 
-## Key Files to Know
+## 需要认识的关键文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |------|---------|
-| `CLAUDE.md` | Contributing guide, style, and conventions |
-| `libs/Makefile` | Monorepo-level make targets (lock, check-lock) |
-| `libs/{core,langchain_v1,partners/*/Makefile` | Per-package test, lint, format targets |
-| `.pre-commit-config.yaml` | Git hooks for code quality |
-| `pyproject.toml` (per-package) | Package metadata, dependencies, build config |
+| `CLAUDE.md` | 贡献指南、风格与规范 |
+| `libs/Makefile` | monorepo 级 make 目标(lock、check-lock) |
+| `libs/{core,langchain_v1,partners/*/Makefile` | 各包的 test、lint、format 目标 |
+| `.pre-commit-config.yaml` | 代码质量 git 钩子 |
+| `pyproject.toml`(每包) | 包元数据、依赖、构建配置 |
 
-## Troubleshooting
+## 故障排查
 
-### Tests Fail with Socket Errors
-Tests run with socket restrictions by default. If you need network access:
-- Write an integration test in `tests/integration_tests/` (see [Integration Testing](/openwiki/integration-tests.md))
-- Or disable socket restrictions locally: `uv run --group test pytest --disable-socket=false ...`
+### 测试因套接字报错失败
+测试默认限制套接字。若确需联网:
+- 把测试写到 `tests/integration_tests/`(见 [Integration Testing](/openwiki/integration-tests.md))
+- 或本地解除限制:`uv run --group test pytest --disable-socket=false ...`
 
-### Import Errors or Version Mismatches
-Regenerate lockfiles:
+### 导入错误或版本不匹配
+重新生成 lockfile:
 ```bash
 cd libs
 make lock
 ```
 
-Or in a single package:
+或单个包内:
 ```bash
 cd libs/core
 uv lock
 ```
 
-### Type Checking Fails
-Run mypy to see detailed errors:
+### 类型检查失败
+运行 mypy 查看详细错误:
 ```bash
 make type
 ```
 
-Check the [Chat Models](/openwiki/chat-models.md) or [Runnables](/openwiki/runnables.md) pages for type signature patterns.
+类型签名写法可参考 [Chat Models](/openwiki/chat-models.md) 或 [Runnables](/openwiki/runnables.md)。
 
-### Pre-Commit Hooks Block Commit
-Pre-commit will auto-fix formatting and some issues. Re-stage and commit:
+### pre-commit 钩子拦截提交
+pre-commit 会自动修复格式和部分问题。重新暂存再提交:
 ```bash
 git add .
-git commit -m "..."  # Try again
+git commit -m "..."  # 再试一次
 ```
 
-If linting still fails, run `make lint` to see details and fix manually.
+若 lint 仍失败,运行 `make lint` 看细节并手动修复。
 
-## Quick Command Reference
+## 常用命令速查
 
 ```bash
-# Setup
-uv sync --all-groups          # Install all dependencies
-pre-commit install            # Setup git hooks
+# 环境搭建
+uv sync --all-groups          # 安装全部依赖
+pre-commit install            # 安装 git 钩子
 
-# Testing
-make test                      # Run unit tests
-make test TEST_FILE=path/     # Run specific test file
-make test_watch               # Watch mode (auto-rerun)
-make integration_tests        # Run integration tests
+# 测试
+make test                      # 运行单元测试
+make test TEST_FILE=path/     # 运行指定测试文件
+make test_watch               # 监视模式(自动重跑)
+make integration_tests        # 运行集成测试
 
-# Code Quality
-make format                   # Format code (ruff)
-make lint                     # Check linting (ruff, mypy)
-make type                     # Type check only (mypy)
+# 代码质量
+make format                   # 格式化(ruff)
+make lint                     # lint 检查(ruff、mypy)
+make type                     # 仅类型检查(mypy)
 
-# Lockfile Management
-cd libs && make lock          # Regenerate all lockfiles
-cd libs && make check-lock    # Verify lockfiles are up-to-date
+# Lockfile 管理
+cd libs && make lock          # 重新生成全部 lockfile
+cd libs && make check-lock    # 校验 lockfile 是否最新
 
-# All Before PR
+# 提 PR 前全量检查
 make format && make lint && make test
 ```
 
-## Next Steps
+## 下一步
 
-1. **Read [CLAUDE.md](repo://CLAUDE.md)** for contributing conventions
-2. **Pick a wiki page** from [Quick Navigation](#quick-navigation-to-major-areas) matching your task
-3. **Clone, setup, and make your first change**
-4. **Run `make format lint test`** to validate locally
-5. **Open a PR** and engage with the team
+1. **阅读 [CLAUDE.md](repo://CLAUDE.md)** 了解贡献规范
+2. **按任务挑一个 wiki 页面**(见[快速导航](#快速导航到主要领域))
+3. **克隆、配置环境,完成第一处修改**
+4. **运行 `make format lint test`** 本地校验
+5. **发起 PR** 并跟进评审
 
-Welcome to LangChain! 🚀
+欢迎来到 LangChain!🚀
