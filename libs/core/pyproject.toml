@@ -1,12 +1,21 @@
+# ============================================================
+# langchain-core 包配置(中文注释版)
+# 🌐 注释由 langchain-chinese 汉化项目添加,原配置项保持不变。
+# langchain-core 是 LangChain 三层架构的最底层:提供 Runnable、
+# BaseChatModel、messages、tools、prompts 等基础抽象。
+# ============================================================
 [build-system]
+# 构建后端使用 hatchling,打包/构建仅需声明它即可
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
+# 包名与描述:通过可组合抽象用 LLM 构建应用
 name = "langchain-core"
 description = "Building applications with LLMs through composability"
 license = {text = "MIT"}
 readme = "README.md"
+# PyPI 分类标签:生产稳定级、面向开发者、MIT 许可、支持 Python 3.10-3.14
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -21,8 +30,21 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
+# 当前版本(与 langchain_core/version.py 保持一致,pre-commit 会校验)
 version = "1.6.2"
+# 支持的 Python 范围:3.10 及以上、4.0 以下
 requires-python = ">=3.10.0,<4.0.0"
+# 运行时依赖(全部上界锁定到下一个大版本,避免破坏性升级):
+# - langsmith:追踪/可观测平台 SDK
+# - httpx:HTTP 客户端(异步支持)
+# - tenacity:重试逻辑(排除有缺陷的 8.4.0)
+# - jsonpatch:JSON 补丁运算
+# - PyYAML:YAML 序列化
+# - typing-extensions:跨版本类型特性
+# - packaging:版本号解析
+# - pydantic:数据模型与校验(核心依赖)
+# - uuid-utils:高性能 UUID
+# - langchain-protocol:协议定义
 dependencies = [
     "langsmith>=0.3.45,<1.0.0",
     "httpx>=0.23.0,<1.0.0",
@@ -37,6 +59,7 @@ dependencies = [
 ]
 
 [project.urls]
+# 项目相关链接
 Homepage = "https://docs.langchain.com/"
 Documentation = "https://reference.langchain.com/python/langchain_core/"
 Repository = "https://github.com/langchain-ai/langchain"
@@ -46,19 +69,30 @@ Twitter = "https://x.com/langchain_oss"
 Slack = "https://www.langchain.com/join-community"
 Reddit = "https://www.reddit.com/r/LangChain/"
 
+# ---- uv 依赖组:按需安装(`uv sync --group <名称>`)----
 [dependency-groups]
+# lint 组:ruff 代码检查与格式化
 lint = ["ruff>=0.15.0,<0.17.0"]
+# typing 组:mypy 静态类型检查及第三方库类型存根
 typing = [
     "mypy>=2.1.0,<2.2.0",
     "types-pyyaml>=6.0.12.2,<7.0.0.0",
     "types-requests>=2.28.11.5,<3.0.0.0",
     "langchain-text-splitters>=1.0.0,<2.0.0",
 ]
+# dev 组:本地开发辅助工具(Jupyter、打包工具、图布局库)
 dev = [
     "jupyter>=1.0.0,<2.0.0",
     "setuptools>=67.6.1,<84.0.0",
     "grandalf>=0.8.0,<1.0.0",
 ]
+# test 组:单元测试工具链
+# - pytest-socket:禁用套接字,防止单元测试意外联网
+# - pytest-xdist:并行执行
+# - freezegun:冻结时间
+# - syrupy:快照测试
+# - blockbuster:检测阻塞式调用混入异步代码
+# - numpy 按 Python 版本选择大版本
 test = [
     "pytest>=9.0.3,<10.0.0",
     "freezegun>=1.2.2,<2.0.0",
@@ -77,59 +111,78 @@ test = [
     "pytest-benchmark",
     "pytest-codspeed",
 ]
+# 集成测试组(当前为空,集成测试依赖在各 partner 包中声明)
 test_integration = []
 
 [tool.uv]
+# 全工作区依赖约束:修复 pygments 的已知 CVE-2026-4539
 constraint-dependencies = ["pygments>=2.20.0"]  # CVE-2026-4539
 
+# 可编辑安装(monorepo 内部包互相引用时直接指向本地路径)
 [tool.uv.sources]
 langchain-tests = { path = "../standard-tests" }
 langchain-text-splitters = { path = "../text-splitters" }
 
 
+# ---- mypy:严格模式静态类型检查 ----
 [tool.mypy]
 plugins = ["pydantic.mypy"]
 strict = true
 enable_error_code = "deprecated"
 warn_unreachable = true
 
+# ---- ruff:格式化配置 ----
 [tool.ruff.format]
+# docstring 内的代码示例也参与格式化
 docstring-code-format = true
 
+# ---- ruff:lint 规则 ----
 [tool.ruff.lint]
+# 默认启用全部规则集,再按下表豁免
 select = [ "ALL",]
 ignore = [
-    "C90",     # McCabe complexity
-    "COM812",  # Messes with the formatter
-    "CPY",     # No copyright
-    "FIX002",  # Line contains TODO
-    "PERF203", # Rarely useful
-    "PLR09",   # Too many something (arg, statements, etc)
-    "TD002",   # Missing author in TODO
-    "TD003",   # Missing issue link in TODO
+    "C90",     # McCabe complexity —— 圈复杂度限制
+    "COM812",  # Messes with the formatter —— 与格式化工具冲突
+    "CPY",     # No copyright —— 不强制版权头
+    "FIX002",  # Line contains TODO —— 允许 TODO 行
+    "PERF203", # Rarely useful —— try/except 性能规则用处不大
+    "PLR09",   # Too many something (arg, statements, etc) —— 参数/语句数量上限
+    "TD002",   # Missing author in TODO —— TODO 不强制署名
+    "TD003",   # Missing issue link in TODO —— TODO 不强制关联 issue
 
-    # TODO rules
-    "ANN401",  # No Any types
-    "BLE",     # Blind exceptions
-    "ERA",     # No commented-out code
+    # TODO rules —— 待定规则
+    "ANN401",  # No Any types —— 允许 Any 类型
+    "BLE",     # Blind exceptions —— 允许宽泛异常捕获
+    "ERA",     # No commented-out code —— 允许注释掉的代码
 ]
+# 不自动修复的规则:B028 警告参数 stacklevel 需人工调优
 unfixable = [
     "B028",    # People should intentionally tune the stacklevel
 ]
 
+# 细则:*args/**kwargs 允许 Any;__init__ 返回 None 免标注;内置名 id/input/type 可作参数名
 flake8-annotations.allow-star-arg-any = true
 flake8-annotations.mypy-init-return = true
 flake8-builtins.ignorelist = ["id", "input", "type"]
+# 这些基类的子类注解按运行时求值(Pydantic/Serializable/Runnable 等)
 flake8-type-checking.runtime-evaluated-base-classes = [ "pydantic.BaseModel", "langchain_core.load.serializable.Serializable", "langchain_core.runnables.base.RunnableSerializable", "langchain_core.language_models.base.BaseLanguageModel", "langchain_core.outputs.generation.Generation", "langchain_core.tools.base.BaseTool",]
+# 这些装饰器标记的方法按类方法命名规范检查
 pep8-naming.classmethod-decorators = [ "classmethod", "langchain_core.utils.pydantic.pre_init", "pydantic.field_validator", "pydantic.v1.root_validator",]
 
+# 禁止一切相对导入
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 
+# docstring 风格:Google;*args/**kwargs 可不写文档
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 ignore-var-parameters = true  # ignore missing documentation for *args and **kwargs parameters
 
+# 按文件路径豁免规则:
+# - mustache.py:允许全局语句
+# - sys_info.py:允许 print
+# - tests/**:豁免文档字符串、魔法值、安全检查、私有访问
+# - scripts/**:豁免包外导入、安全检查、print
 [tool.ruff.lint.per-file-ignores]
 "langchain_core/utils/mustache.py" = [ "PLW0603",]
 "langchain_core/sys_info.py" = [ "T201",]
@@ -137,15 +190,23 @@ ignore-var-parameters = true  # ignore missing documentation for *args and **kwa
 "tests/**" = [ "D1", "PLR2004", "S", "SLF",]
 "scripts/**" = [ "INP", "S", "T201",]
 
+# ---- 覆盖率:统计时排除 tests 目录 ----
 [tool.coverage.run]
 omit = [ "tests/*",]
 
+# ---- pytest 配置 ----
 [tool.pytest.ini_options]
+# 快照未使用仅告警;标记/配置必须严格声明;输出最慢 5 项
 addopts = "--snapshot-warn-unused --strict-markers --strict-config --durations=5"
+# 自定义标记:
+# - requires:标注测试依赖特定库(未安装则跳过)
+# - compile:仅编译集成测试不实际运行的占位测试
 markers = [
     "requires: mark tests as requiring a specific library",
     "compile: mark placeholder test used to compile integration tests without running them",
 ]
+# asyncio 测试自动识别;fixture 作用域按函数
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# 忽略 LangChain beta 特性告警
 filterwarnings = [ "ignore::langchain_core._api.beta_decorator.LangChainBetaWarning",]

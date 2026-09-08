@@ -1,50 +1,71 @@
+# ============================================================
+# LangChain monorepo pre-commit 钩子配置(中文注释版)
+# 🌐 注释由 langchain-chinese 汉化项目添加,原配置保持不变。
+# 作用:git commit 时自动执行格式化、语法校验与一致性检查;
+# 首次使用请先运行 `pre-commit install`。
+# ============================================================
 repos:
+  # ---- 通用仓库钩子(官方 pre-commit-hooks)----
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.3.0
     hooks:
+      # 禁止直接向受保护分支(master)提交
       - id: no-commit-to-branch # prevent direct commits to protected branches
         args: ["--branch", "master"]
+      # 校验 YAML 语法
       - id: check-yaml # validate YAML syntax
-        args: ["--unsafe"] # allow custom tags
+        args: ["--unsafe"] # allow custom tags —— 允许自定义标签
+      # 校验 TOML 语法
       - id: check-toml # validate TOML syntax
+      # 保证文件以换行符结尾
       - id: end-of-file-fixer # ensure files end with a newline
+      # 移除行尾空白字符
       - id: trailing-whitespace # remove trailing whitespace from lines
-        exclude: \.ambr$
+        exclude: \.ambr$  # 排除 .ambr 快照文件(格式敏感)
 
-  # Text normalization hooks for consistent formatting
+  # ---- 文本规范化钩子,保证格式一致 ----
   - repo: https://github.com/sirosen/texthooks
     rev: 0.6.8
     hooks:
+      # 弯引号替换为直引号
       - id: fix-smartquotes # replace curly quotes with straight quotes
+      # 非标准空格(如不间断空格)替换为普通空格
       - id: fix-spaces # replace non-standard spaces (e.g., non-breaking) with regular spaces
 
-  # Per-package format and lint hooks for the monorepo
+  # ---- monorepo 按包粒度的格式化 + lint 钩子 ----
+  # 说明:每条钩子只在对应目录文件变更时触发(pass_filenames: false
+  # 表示调用 make 目标而非逐文件处理),执行该包的 `make format lint`。
   - repo: local
     hooks:
+      # core 包:格式化 + lint
       - id: core
         name: format and lint core
         language: system
         entry: make -C libs/core format lint
         files: ^libs/core/
         pass_filenames: false
+      # langchain 包:格式化 + lint
       - id: langchain
         name: format and lint langchain
         language: system
         entry: make -C libs/langchain format lint
         files: ^libs/langchain/
         pass_filenames: false
+      # standard-tests 包:格式化 + lint
       - id: standard-tests
         name: format and lint standard-tests
         language: system
         entry: make -C libs/standard-tests format lint
         files: ^libs/standard-tests/
         pass_filenames: false
+      # text-splitters 包:格式化 + lint
       - id: text-splitters
         name: format and lint text-splitters
         language: system
         entry: make -C libs/text-splitters format lint
         files: ^libs/text-splitters/
         pass_filenames: false
+      # 以下为各 partner 集成包的格式化 + lint
       - id: anthropic
         name: format and lint partners/anthropic
         language: system
@@ -111,102 +132,124 @@ repos:
         entry: make -C libs/partners/qdrant format lint
         files: ^libs/partners/qdrant/
         pass_filenames: false
+
+  # ---- 版本一致性检查:pyproject.toml 与包内版本文件必须同步 ----
+  # 任一文件变更即触发对应包的 `make check_version`。
+  - repo: local
+    hooks:
+      # core 包版本一致性
       - id: core-version
         name: check core version consistency
         language: system
         entry: make -C libs/core check_version
         files: ^libs/core/(pyproject\.toml|langchain_core/version\.py)$
         pass_filenames: false
+      # langchain v1 包版本一致性
       - id: langchain-v1-version
         name: check langchain version consistency
         language: system
         entry: make -C libs/langchain_v1 check_version
         files: ^libs/langchain_v1/(pyproject\.toml|langchain/__init__\.py)$
         pass_filenames: false
+      # anthropic 包版本一致性
       - id: anthropic-version
         name: check anthropic version consistency
         language: system
         entry: make -C libs/partners/anthropic check_version
         files: ^libs/partners/anthropic/(pyproject\.toml|langchain_anthropic/_version\.py)$
         pass_filenames: false
+      # chroma 包版本一致性
       - id: chroma-version
         name: check chroma version consistency
         language: system
         entry: make -C libs/partners/chroma check_version
         files: ^libs/partners/chroma/(pyproject\.toml|langchain_chroma/_version\.py)$
         pass_filenames: false
+      # deepseek 包版本一致性
       - id: deepseek-version
         name: check deepseek version consistency
         language: system
         entry: make -C libs/partners/deepseek check_version
         files: ^libs/partners/deepseek/(pyproject\.toml|langchain_deepseek/_version\.py)$
         pass_filenames: false
+      # exa 包版本一致性
       - id: exa-version
         name: check exa version consistency
         language: system
         entry: make -C libs/partners/exa check_version
         files: ^libs/partners/exa/(pyproject\.toml|langchain_exa/_version\.py)$
         pass_filenames: false
+      # fireworks 包版本一致性
       - id: fireworks-version
         name: check fireworks version consistency
         language: system
         entry: make -C libs/partners/fireworks check_version
         files: ^libs/partners/fireworks/(pyproject\.toml|langchain_fireworks/_version\.py)$
         pass_filenames: false
+      # groq 包版本一致性
       - id: groq-version
         name: check groq version consistency
         language: system
         entry: make -C libs/partners/groq check_version
         files: ^libs/partners/groq/(pyproject\.toml|langchain_groq/_version\.py)$
         pass_filenames: false
+      # huggingface 包版本一致性
       - id: huggingface-version
         name: check huggingface version consistency
         language: system
         entry: make -C libs/partners/huggingface check_version
         files: ^libs/partners/huggingface/(pyproject\.toml|langchain_huggingface/_version\.py)$
         pass_filenames: false
+      # mistralai 包版本一致性
       - id: mistralai-version
         name: check mistralai version consistency
         language: system
         entry: make -C libs/partners/mistralai check_version
         files: ^libs/partners/mistralai/(pyproject\.toml|langchain_mistralai/_version\.py)$
         pass_filenames: false
+      # nomic 包版本一致性
       - id: nomic-version
         name: check nomic version consistency
         language: system
         entry: make -C libs/partners/nomic check_version
         files: ^libs/partners/nomic/(pyproject\.toml|langchain_nomic/_version\.py)$
         pass_filenames: false
+      # ollama 包版本一致性
       - id: ollama-version
         name: check ollama version consistency
         language: system
         entry: make -C libs/partners/ollama check_version
         files: ^libs/partners/ollama/(pyproject\.toml|langchain_ollama/_version\.py)$
         pass_filenames: false
+      # openai 包版本一致性
       - id: openai-version
         name: check openai version consistency
         language: system
         entry: make -C libs/partners/openai check_version
         files: ^libs/partners/openai/(pyproject\.toml|langchain_openai/_version\.py)$
         pass_filenames: false
+      # openrouter 包版本一致性
       - id: openrouter-version
         name: check openrouter version consistency
         language: system
         entry: make -C libs/partners/openrouter check_version
         files: ^libs/partners/openrouter/(pyproject\.toml|langchain_openrouter/_version\.py)$
         pass_filenames: false
+      # perplexity 包版本一致性
       - id: perplexity-version
         name: check perplexity version consistency
         language: system
         entry: make -C libs/partners/perplexity check_version
         files: ^libs/partners/perplexity/(pyproject\.toml|langchain_perplexity/_version\.py)$
         pass_filenames: false
+      # qdrant 包版本一致性
       - id: qdrant-version
         name: check qdrant version consistency
         language: system
         entry: make -C libs/partners/qdrant check_version
         files: ^libs/partners/qdrant/(pyproject\.toml|langchain_qdrant/_version\.py)$
         pass_filenames: false
+      # xai 包版本一致性
       - id: xai-version
         name: check xai version consistency
         language: system
