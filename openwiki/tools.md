@@ -21,73 +21,77 @@ sources:
 generated: { by: "openwiki/0.5.0", at: "2026-09-03T15:18:34.589Z" }
 ---
 
+> 🌐 本文档由 [langchain-ai/langchain](https://github.com/langchain-ai/langchain) 翻译,英文原版见原项目。
+>
+> ⚠️ 原文超过 10000 字符,本页翻译核心章节;代码块保持原样,完整细节见英文原版。
 
-## Overview
 
-LangChain's tool system enables agents and language models to execute structured actions by converting Python functions and Runnables into schema-aware components. Tools form the core execution mechanism for agentic workflows, providing automatic argument validation, error handling, and integration with callback systems.
+## 总览
 
-The tool ecosystem consists of three layers:
+LangChain 的工具系统通过把 Python 函数和 Runnable 转换为带 schema 感知的组件,让智能体和语言模型能够执行结构化动作。工具是智能体工作流的核心执行机制,提供自动参数校验、错误处理以及与回调系统的集成。
 
-1. **BaseTool**: Core abstract interface defining tool protocol and execution semantics
-2. **Tool Types**: Concrete implementations (StructuredTool, Tool) for different input patterns
-3. **Tool Creation**: Decorators and factories (@tool, convert_runnable_to_tool) that generate tools from functions and runnables
+工具生态由三层组成:
 
-## BaseTool Protocol and Core Responsibilities
+1. **BaseTool**:定义工具协议与执行语义的核心抽象接口
+2. **工具类型**:面向不同输入模式的具体实现(StructuredTool、Tool)
+3. **工具创建**:从函数和 runnable 生成工具的装饰器与工厂(@tool、convert_runnable_to_tool)
 
-BaseTool is the abstract base class extending RunnableSerializable that defines the contract for all tools. Every tool carries three essential descriptors and configuration for execution control.
+## BaseTool 协议与核心职责
 
-**Required Properties:**
-- `name: str` — Unique identifier that clearly communicates purpose; used by agents and models to select tools
-- `description: str` — Human-readable text explaining when and why to use the tool; guides model decisions
-- `args_schema: TypeBaseModel | dict | None` — Pydantic model or JSON schema dict specifying valid input arguments
+BaseTool 是继承 RunnableSerializable 的抽象基类,定义所有工具的契约。每个工具都携带三个必备描述符以及执行控制配置。
 
-**Execution Control:**
-- `return_direct: bool` — When True, agent stops looping immediately after tool execution (terminal action)
-- `response_format: "content" | "content_and_artifact"` — If "content_and_artifact", tool must return a two-tuple (content, artifact) for structured output with optional artifacts
-- `handle_tool_error: bool | str | Callable` — Strategy for ToolException: False (re-raise), True (use exception message), str (fixed message), or callable (custom handler)
-- `handle_validation_error: bool | str | Callable` — Strategy for pydantic ValidationError during input parsing
+**必需属性:**
+- `name: str` — 清晰表达用途的唯一标识;智能体和模型靠它选择工具
+- `description: str` — 说明何时以及为何使用该工具的人类可读文本;引导模型决策
+- `args_schema: TypeBaseModel | dict | None` — 指定合法输入参数的 Pydantic 模型或 JSON schema 字典
 
-**Callbacks & Metadata:**
-- `callbacks: Callbacks` — Lifecycle callbacks (on_tool_start, on_tool_end, on_tool_error) for tracing and monitoring
-- `tags: list[str]` — Optional semantic labels attached to all invocations for filtering and metrics
-- `metadata: dict` — Custom application-specific metadata passed to callbacks
-- `verbose: bool` — Whether to log tool progress
+**执行控制:**
+- `return_direct: bool` — 为 True 时,智能体在工具执行后立即停止循环(终态动作)
+- `response_format: "content" | "content_and_artifact"` — 若为 "content_and_artifact",工具必须返回二元组 (content, artifact),实现结构化输出并附带工件
+- `handle_tool_error: bool | str | Callable` — ToolException 处理策略:False(重新抛出)、True(用异常消息)、字符串(固定消息)或可调用对象(自定义处理)
+- `handle_validation_error: bool | str | Callable` — 输入解析期间 pydantic ValidationError 的处理策略
 
-**Provider Integration:**
-- `extras: dict[str, Any]` — Provider-specific configuration (e.g., Anthropic cache_control, defer_loading) passed to chat models during tool rendering
+**回调与元数据:**
+- `callbacks: Callbacks` — 生命周期回调(on_tool_start、on_tool_end、on_tool_error),用于追踪和监控
+- `tags: list[str]` — 附加到所有调用的可选语义标签,用于过滤和统计
+- `metadata: dict` — 传给回调的应用自定义元数据
+- `verbose: bool` — 是否记录工具执行进度
 
-## Input Schema Generation and Validation
+**供应商集成:**
+- `extras: dict[str, Any]` — 供应商专属配置(如 Anthropic 的 cache_control、defer_loading),在工具渲染时传给聊天模型
 
-Tool input validation is built on Pydantic models generated from function signatures. The schema generation pipeline handles both automatic inference and explicit specification.
+## 输入 Schema 生成与校验
 
-**Schema Sources (by precedence):**
-1. Explicit `args_schema` parameter provided to tool decorator or factory
-2. JSON schema dict if `args_schema` is already a dict
-3. Inferred from function signature via `create_schema_from_function()`
+工具输入校验建立在由函数签名生成的 Pydantic 模型上。schema 生成管线同时支持自动推断与显式指定。
 
-**Inference Process:**
+**Schema 来源(按优先级):**
+1. 提供给工具装饰器或工厂的显式 `args_schema` 参数
+2. 若 `args_schema` 已是 dict,则直接作为 JSON schema
+3. 通过 `create_schema_from_function()` 从函数签名推断
 
-When `infer_schema=True` (default), the tool examines the function signature to generate a Pydantic model:
+**推断过程:**
 
-- Type hints are extracted via `get_type_hints()` with support for `Annotated` types
-- Function docstring is parsed (if `parse_docstring=True`) following Google style to extract parameter descriptions
-- Descriptions are merged from: Annotated metadata → docstring Args section → none
-- Injected arguments (those annotated with `InjectedToolArg`, `InjectedToolCallId`, or `ToolRuntime`) are automatically excluded from the schema sent to models but re-injected at runtime
-- Reserved parameter names (`run_manager`, `callbacks`, `config`) are filtered from the user-facing schema
+当 `infer_schema=True`(默认)时,工具检查函数签名生成 Pydantic 模型:
 
-**Memoization:** The `tool_call_schema` property builds and caches a subset model class per tool instance, excluding injected arguments. The schema class's `model_json_schema()` method is patched to cache the generated dict, preventing expensive regeneration on every agent loop.
+- 通过 `get_type_hints()` 提取类型标注,支持 `Annotated` 类型
+- 解析函数 docstring(当 `parse_docstring=True`),按 Google 风格提取参数描述
+- 描述合并顺序:Annotated 元数据 → docstring Args 小节 → 无
+- 注入参数(标注 `InjectedToolArg`、`InjectedToolCallId` 或 `ToolRuntime` 的参数)自动从发给模型的 schema 中排除,并在运行时重新注入
+- 保留参数名(`run_manager`、`callbacks`、`config`)会从面向用户的 schema 中过滤掉
 
-**Input Parsing and Validation:**
+**记忆化:** `tool_call_schema` 属性为每个工具实例构建并缓存一个子集模型类(排除注入参数)。该 schema 类的 `model_json_schema()` 方法被修补为缓存生成的 dict,避免每轮智能体循环都做昂贵重建。
 
-During execution, tool input is parsed by `_parse_input()`:
-- String input is mapped to the single argument if the schema defines exactly one field
-- Dict input is validated via Pydantic, with Annotated descriptions providing field documentation
-- Injected arguments are identified by signature inspection and re-injected from tool metadata or invocation context (e.g., `tool_call_id`, `ToolRuntime`)
-- Validation errors are caught and handled according to `handle_validation_error` configuration
+**输入解析与校验:**
 
-**Annotation-Driven Descriptions:**
+执行期间,工具输入由 `_parse_input()` 解析:
+- 字符串输入在 schema 只有一个字段时映射到该参数
+- 字典输入经 Pydantic 校验,Annotated 描述提供字段文档
+- 注入参数通过签名检查识别,并从工具元数据或调用上下文重新注入(如 `tool_call_id`、`ToolRuntime`)
+- 校验错误被捕获并按 `handle_validation_error` 配置处理
 
-Parameter descriptions can come from Annotated field metadata:
+**注解驱动的描述:**
+
+参数描述可来自 Annotated 字段元数据:
 
 ```python
 from typing import Annotated
@@ -102,15 +106,15 @@ def my_function(
     return f"search: {query}"
 ```
 
-Both `Field(description=...)` and direct string annotations are supported and merged into the generated schema.
+`Field(description=...)` 和直接字符串标注都支持,并合并进生成的 schema。
 
-## ToolCall and ToolMessage: Request-Response Protocol
+## ToolCall 与 ToolMessage:请求-响应协议
 
-Tools are invoked via ToolCall objects and respond with ToolMessage objects, enabling structured communication in agentic loops.
+工具通过 ToolCall 对象调用,并以 ToolMessage 对象响应,在智能体循环中实现结构化通信。
 
-**ToolCall (from messages/tool.py):**
+**ToolCall(来自 messages/tool.py):**
 
-A ToolCall is a TypedDict representing a model's request to execute a tool:
+ToolCall 是表示模型执行工具请求的 TypedDict:
 
 ```python
 {
@@ -121,11 +125,11 @@ A ToolCall is a TypedDict representing a model's request to execute a tool:
 }
 ```
 
-Multiple ToolCalls can be streamed and merged via `AIMessageChunk`, with streaming yielding `ToolCallChunk` objects that progressively build the arguments JSON string.
+多个 ToolCall 可通过 `AIMessageChunk` 流式传输与合并;流式产出 `ToolCallChunk` 对象,逐步拼出参数 JSON 字符串。
 
-**ToolMessage (from messages/tool.py):**
+**ToolMessage(来自 messages/tool.py):**
 
-Returned by tools to communicate results back to the model:
+工具用它把结果传回模型:
 
 ```python
 ToolMessage(
@@ -137,57 +141,57 @@ ToolMessage(
 )
 ```
 
-- `artifact`: Stores full tool output when only a summary is sent to the model
-- `status`: Allows tools to report errors without raising exceptions (e.g., when `handle_tool_error=True`)
-- Content supports rich formatting: plain text or list of message content blocks (images, JSON, search results, documents, etc.)
+- `artifact`:当只给模型发摘要时,存放完整工具输出
+- `status`:允许工具不抛异常就上报错误(如 `handle_tool_error=True` 时)
+- content 支持富格式:纯文本或消息内容块列表(图片、JSON、搜索结果、文档等)
 
-**ToolOutputMixin:** An empty mixin class used to identify custom objects that tools can return directly without coercion to string. Tools can return ToolOutputMixin instances or lists of them, bypassing automatic ToolMessage wrapping.
+**ToolOutputMixin:** 一个空 mixin 类,用于标识工具可以直接返回、不必强转为字符串的自定义对象。工具可返回 ToolOutputMixin 实例或其列表,绕过自动的 ToolMessage 包装。
 
-## Execution: run() and arun() Methods
+## 执行:run() 与 arun() 方法
 
-Both synchronous and asynchronous execution follow the same lifecycle:
+同步与异步执行遵循同一生命周期:
 
-1. **Configuration:** Merge callbacks from tool config, invocation args, and runnable config
-2. **Parsing:** Convert tool input (str/dict/ToolCall) to function args/kwargs via `_parse_input()` and `_to_args_and_kwargs()`
-3. **Injection:** Inject runtime values (run_manager, callbacks, RunnableConfig) if function signature declares them
-4. **Execution:** Call `_run()` or `_arun()` within callback context, propagating config through context variables
-5. **Formatting:** Convert output to ToolMessage if invoked with `tool_call_id`, preserving status and artifacts
-6. **Error Handling:** Catch ToolException and ValidationError, apply handler strategy (re-raise, return message, or invoke custom handler)
+1. **配置:** 合并来自工具配置、调用参数和 runnable 配置的回调
+2. **解析:** 通过 `_parse_input()` 与 `_to_args_and_kwargs()` 把工具输入(str/dict/ToolCall)转为函数 args/kwargs
+3. **注入:** 若函数签名声明了运行时值(run_manager、callbacks、RunnableConfig),则注入
+4. **执行:** 在回调上下文中调用 `_run()` 或 `_arun()`,经上下文变量传递配置
+5. **格式化:** 若带 `tool_call_id` 调用,把输出转为 ToolMessage,保留 status 与 artifact
+6. **错误处理:** 捕获 ToolException 与 ValidationError,应用处理策略(重抛、返回消息或调用自定义处理)
 
-**Callback Lifecycle:**
+**回调生命周期:**
 
-- `on_tool_start()`: Fired before execution with filtered inputs (injected args removed), tool metadata, and trace ID
-- `on_tool_end()`: Fired after success with formatted output
-- `on_tool_error()`: Fired on exception with the exception and trace ID
+- `on_tool_start()`:执行前触发,输入已过滤(移除注入参数),附工具元数据和 trace ID
+- `on_tool_end()`:成功后触发,附格式化输出
+- `on_tool_error()`:异常时触发,附异常与 trace ID
 
-**Config Propagation:**
+**配置传播:**
 
-RunnableConfig passed to invoke/ainvoke is patched with child callbacks and injected into tool execution context, enabling nested tools and state/store access via `ToolRuntime` parameters.
+传给 invoke/ainvoke 的 RunnableConfig 会被补上子回调并注入工具执行上下文,使嵌套工具以及经 `ToolRuntime` 参数访问 state/store 成为可能。
 
-## Tool Types: Tool and StructuredTool
+## 工具类型:Tool 与 StructuredTool
 
-LangChain provides two concrete tool implementations with different input handling semantics.
+LangChain 提供两个输入处理语义不同的具体实现。
 
-**Tool (simple.py):**
-- Single-input tool expecting string or dict coercion to string
-- No explicit args schema required; defaults to `{"tool_input": {"type": "string"}}`
-- Used for simple function wrappers and legacy compatibility
-- Validates that exactly one argument is passed after schema parsing
+**Tool(simple.py):**
+- 单输入工具,接受字符串或可强转为字符串的 dict
+- 无需显式 args schema;默认 `{"tool_input": {"type": "string"}}`
+- 用于简单函数包装和遗留兼容
+- 校验 schema 解析后恰好只传一个参数
 
-**StructuredTool (structured.py):**
-- Multi-argument tool with explicit schema-driven parsing
-- Each function parameter becomes a separate schema field (unless injected)
-- Supports both `func` (sync) and `coroutine` (async)
-- Falls back to executor for sync invocation if no coroutine defined
-- Preferred pattern for agent tools with multiple named parameters
+**StructuredTool(structured.py):**
+- 多参数工具,按显式 schema 驱动解析
+- 每个函数参数成为独立的 schema 字段(注入参数除外)
+- 同时支持 `func`(同步)与 `coroutine`(异步)
+- 未定义 coroutine 时,同步调用回退到 executor
+- 多命名参数的智能体工具首选模式
 
-Both inherit from BaseTool and override `_run()` and `_arun()` to delegate to the wrapped function while preserving config and callbacks.
+两者都继承 BaseTool,重写 `_run()` 和 `_arun()`,委托给被包装的函数,同时保留配置与回调。
 
-## Tool Creation: @tool Decorator and Factories
+## 工具创建:@tool 装饰器与工厂
 
-The `@tool` decorator provides the primary user-facing API for converting functions into tools, with overloads supporting multiple usage patterns.
+`@tool` 装饰器是把函数转为工具的主要用户 API,多个重载支持多种用法。
 
-**Decorator Forms:**
+**装饰器形式:**
 
 ```python
 # Form 1: No arguments (name from function)
@@ -210,43 +214,43 @@ def search(query: str) -> str:
 tool_obj = tool("math_tool", my_runnable, description="...")
 ```
 
-**Key Behaviors:**
+**关键行为:**
 
-- Default name is `function.__name__` unless overridden
-- Description precedence: explicit param → function docstring → args_schema description
-- `parse_docstring=True` extracts Google-style Args sections for parameter descriptions (with validation that documented args match signature)
-- `infer_schema=True` (default) automatically generates schema from type hints
-- `infer_schema=False` requires explicit description and creates Tool (string-input) instead of StructuredTool
-- `response_format="content_and_artifact"` expects function to return `(content, artifact)` tuple
+- 默认名称为 `function.__name__`,除非显式覆盖
+- 描述优先级:显式参数 → 函数 docstring → args_schema 描述
+- `parse_docstring=True` 提取 Google 风格 Args 小节作为参数描述(并校验文档参数与签名一致)
+- `infer_schema=True`(默认)从类型标注自动生成 schema
+- `infer_schema=False` 要求显式描述,并创建 Tool(字符串输入)而非 StructuredTool
+- `response_format="content_and_artifact"` 要求函数返回 `(content, artifact)` 元组
 
-**Runnable Conversion:**
+**Runnable 转换:**
 
-When decorating a Runnable, the tool automatically:
-- Wraps sync/async invoke methods to inject callbacks
-- Uses Runnable's input_schema as the tool's args_schema
-- Generates description from input schema if not provided
-- Delegates to StructuredTool.from_function() for multi-argument runnables or Tool for string schemas
+装饰 Runnable 时,工具会自动:
+- 包装同步/异步 invoke 方法以注入回调
+- 用 Runnable 的 input_schema 作为工具的 args_schema
+- 未提供描述时从输入 schema 生成
+- 多参数 runnable 委托给 StructuredTool.from_function(),字符串 schema 则用 Tool
 
-**Async Support:**
+**异步支持:**
 
-The decorator detects coroutines and creates StructuredTool with both `func` and `coroutine` set, enabling true async execution. Mixed sync/async patterns work via the executor fallback.
+装饰器检测 coroutine,创建同时设置 `func` 与 `coroutine` 的 StructuredTool,实现真异步执行。混合同步/异步模式经 executor 回退可用。
 
-## Schema Rendering for Models
+## 面向模型的 Schema 渲染
 
-Tools are rendered for language models via utility functions in `render.py`:
+工具经 `render.py` 中的工具函数渲染给语言模型:
 
-- `render_text_description(tools: list[BaseTool]) -> str` — Returns `"name - description\n..."` format for prompts
-- `render_text_description_and_args(tools: list[BaseTool]) -> str` — Includes args: `"name - description, args: {...}"`
+- `render_text_description(tools: list[BaseTool]) -> str` — 返回 `"name - description\n..."` 格式,用于提示词
+- `render_text_description_and_args(tools: list[BaseTool]) -> str` — 含参数:`"name - description, args: {...}"`
 
-Models receive tool schemas in provider-specific formats (OpenAI function_calling, Anthropic tool_use, etc.), generated by `function_calling.py` utilities that convert tool_call_schema to FunctionDescription dicts with JSON schema parameters.
+模型以供应商专属格式(OpenAI function_calling、Anthropic tool_use 等)接收工具 schema,由 `function_calling.py` 工具函数把 tool_call_schema 转换为带 JSON schema 参数的 FunctionDescription 字典。
 
-The `tool_call_schema` property ensures models never see injected arguments or reserved parameter names, protecting tool implementation details.
+`tool_call_schema` 属性保证模型永远看不到注入参数或保留参数名,保护工具实现细节。
 
-## Advanced Patterns: Injected Arguments and ToolRuntime
+## 高级模式:注入参数与 ToolRuntime
 
-Tools can receive runtime values not controlled by the model via injected arguments.
+工具可以接收不受模型控制的运行时值,即注入参数。
 
-**InjectedToolArg:** A marker class for parameters that should be injected at runtime:
+**InjectedToolArg:** 标记应在运行时注入的参数:
 
 ```python
 from typing import Annotated
@@ -261,7 +265,7 @@ def my_tool(
     return f"{user_query} in {context_var}"
 ```
 
-**InjectedToolCallId:** Specialized marker to inject the tool_call_id:
+**InjectedToolCallId:** 专门注入 tool_call_id 的标记:
 
 ```python
 @tool
@@ -270,7 +274,7 @@ def track_call(query: str, call_id: InjectedToolCallId) -> str:
     return f"Call {call_id}: {query}"
 ```
 
-**ToolRuntime:** A directly-injected argument type providing access to state, context, and store:
+**ToolRuntime:** 直接注入的参数类型,提供对 state、context 和 store 的访问:
 
 ```python
 from langchain_core.tools import tool, ToolRuntime
@@ -284,17 +288,17 @@ def stateful_tool(query: str, runtime: ToolRuntime) -> str:
     return f"State: {state}, Context: {context}"
 ```
 
-Injected arguments are:
-- Excluded from tool_call_schema sent to models
-- Identified via signature inspection in `_get_injected_args_keys_from_signature()`
-- Re-injected during `_parse_input()` from tool metadata or invocation context
-- Filtered from callback inputs via `_filter_injected_args()`
+注入参数:
+- 不会出现在发给模型的 tool_call_schema 中
+- 由 `_get_injected_args_keys_from_signature()` 经签名检查识别
+- 在 `_parse_input()` 期间从工具元数据或调用上下文重新注入
+- 经 `_filter_injected_args()` 从回调输入中过滤
 
-## Error Handling Strategies
+## 错误处理策略
 
-Tools support flexible error handling to allow graceful recovery in agentic loops.
+工具支持灵活的错误处理,让智能体循环能优雅恢复。
 
-**ToolException:** Custom exception for controlled tool errors:
+**ToolException:** 受控工具错误的自定义异常:
 
 ```python
 from langchain_core.tools import tool, ToolException
@@ -306,7 +310,7 @@ def validate_input(value: str) -> str:
     return f"Valid: {value}"
 ```
 
-**Validation Errors:** Pydantic validation failures are caught and handled per `handle_validation_error`:
+**校验错误:** Pydantic 校验失败被捕获并按 `handle_validation_error` 处理:
 
 ```python
 @tool(handle_validation_error="Invalid input format")
@@ -316,7 +320,7 @@ def my_tool(count: int) -> str:
 # If user passes non-integer, returns "Invalid input format" instead of raising
 ```
 
-**Tool Errors:** ToolException handling per `handle_tool_error`:
+**工具错误:** ToolException 按 `handle_tool_error` 处理:
 
 ```python
 @tool(handle_tool_error=True)  # Use exception message
@@ -326,7 +330,7 @@ def risky_operation() -> str:
 # Returns ToolMessage with status="error", content="Operation failed"
 ```
 
-Custom handlers receive the exception and return str or list of message content blocks:
+自定义处理器接收异常,返回字符串或消息内容块列表:
 
 ```python
 def my_error_handler(e: ToolException) -> str:
@@ -338,11 +342,11 @@ def operation() -> str:
     raise ToolException("Internal error")
 ```
 
-Handled errors return ToolMessage with `status="error"` when invoked with `tool_call_id`, allowing agents to observe and respond to failures without breaking the loop.
+带 `tool_call_id` 调用时,已处理的错误返回 `status="error"` 的 ToolMessage,让智能体可以观察并响应失败而不中断循环。
 
-## BaseToolkit: Organizing Related Tools
+## BaseToolkit:组织相关工具
 
-For complex systems, tools are organized into toolkits via `BaseToolkit`:
+复杂系统中,工具经 `BaseToolkit` 组织为工具箱:
 
 ```python
 from langchain_core.tools import BaseToolkit, tool
@@ -369,15 +373,15 @@ toolkit = MathToolkit()
 tools = toolkit.get_tools()  # Retrieve all related tools
 ```
 
-Toolkits enable:
-- Logical grouping of related functionality
-- Conditional tool availability (return subset based on runtime state)
-- Dynamic tool generation
-- Integration with agent initialization pipelines
+工具箱支持:
+- 相关功能的逻辑分组
+- 条件化的工具可用性(按运行时状态返回子集)
+- 动态工具生成
+- 与智能体初始化管线集成
 
-## Converting Runnables to Tools
+## Runnable 转工具
 
-Runnables can be converted to tools via `tool()` decorator or `convert_runnable_to_tool()` function:
+Runnable 可通过 `tool()` 装饰器或 `convert_runnable_to_tool()` 函数转为工具:
 
 ```python
 from langchain_core.runnables import RunnablePassthrough
@@ -396,49 +400,49 @@ tool_obj = convert_runnable_to_tool(
 tool_obj = tool("passthrough", my_runnable)
 ```
 
-The conversion:
-- Extracts input_schema from Runnable.get_input_jsonschema()
-- Validates schema is object type (required for multi-arg tools)
-- Wraps invoke/ainvoke to inject callbacks into config
-- Delegates to StructuredTool.from_function() with wrapped functions
-- Falls back to Tool for string-input runnables
+转换过程:
+- 从 Runnable.get_input_jsonschema() 提取 input_schema
+- 校验 schema 为 object 类型(多参数工具必需)
+- 包装 invoke/ainvoke,把回调注入 config
+- 用包装后的函数委托给 StructuredTool.from_function()
+- 字符串输入的 runnable 回退到 Tool
 
-## Lifecycle and Invariants
+## 生命周期与不变量
 
-**Tool Instance Lifecycle:**
+**工具实例生命周期:**
 
-1. **Construction:** Schema memoization cleared on `__setattr__` or `model_copy()` if name/description/args_schema changed
-2. **First Schema Access:** tool_call_schema builds subset model, patches class to cache JSON schema
-3. **Execution:** Callbacks configured, input parsed, injected args identified, function called, output formatted
-4. **Pickling:** Schema memo cleared (dynamic classes cannot pickle by reference); rebuilt on next access
+1. **构造:** 若 name/description/args_schema 经 `__setattr__` 或 `model_copy()` 变化,schema 记忆化缓存被清除
+2. **首次访问 schema:** tool_call_schema 构建子集模型,并修补类以缓存 JSON schema
+3. **执行:** 配置回调、解析输入、识别注入参数、调用函数、格式化输出
+4. **Pickle:** 清除 schema 缓存(动态类无法按引用 pickle);下次访问时重建
 
-**Schema Caching Invariants:**
+**Schema 缓存不变量:**
 
-- Memoized subset model class never regenerates if name/description/args_schema unchanged
-- Pydantic model_json_schema() called on subset class returns cached dict on subsequent calls
-- Cache invalidation is explicit via private _TOOL_CALL_SCHEMA_FIELDS check
-- Preserves performance under high-frequency agent loops
+- name/description/args_schema 不变时,记忆化的子集模型类绝不重建
+- 对子集类调用 Pydantic model_json_schema(),后续调用返回缓存 dict
+- 缓存失效通过私有 _TOOL_CALL_SCHEMA_FIELDS 检查显式触发
+- 在高频智能体循环下保持性能
 
-**Execution Invariants:**
+**执行不变量:**
 
-- Callbacks always fire in order: on_tool_start → (on_tool_error | on_tool_end)
-- Config context is set during execution, allowing nested tools to access state/store
-- ToolMessage wrapping only occurs if tool_call_id provided
-- Injected arguments are never visible to the model or in callback inputs
-- Status="error" set only when handle_tool_error converts exception to message
+- 回调始终按序触发:on_tool_start → (on_tool_error | on_tool_end)
+- 执行期间设置配置上下文,嵌套工具可访问 state/store
+- 只有提供 tool_call_id 时才包装为 ToolMessage
+- 注入参数对模型和回调输入均不可见
+- 仅当 handle_tool_error 把异常转为消息时才置 status="error"
 
-## Extension Points
+## 扩展点
 
-**Subclassing BaseTool:**
+**继承 BaseTool:**
 
-Custom tool implementations override:
-- `_run(self, *args, **kwargs) -> Any` — Sync execution logic
-- `_arun(self, *args, **kwargs) -> Any` — Async execution logic (default delegates to _run via executor)
-- `get_input_schema()` — Override schema source (default uses args_schema or creates from _run signature)
+自定义工具实现重写:
+- `_run(self, *args, **kwargs) -> Any` — 同步执行逻辑
+- `_arun(self, *args, **kwargs) -> Any` — 异步执行逻辑(默认经 executor 委托给 _run)
+- `get_input_schema()` — 覆盖 schema 来源(默认用 args_schema 或从 _run 签名创建)
 
-**Custom Error Handlers:**
+**自定义错误处理器:**
 
-Passed as callables to `handle_tool_error` and `handle_validation_error`:
+作为可调用对象传给 `handle_tool_error` 和 `handle_validation_error`:
 
 ```python
 def custom_validation_handler(e: ValidationError) -> str:
@@ -450,24 +454,24 @@ def my_tool(count: int) -> str:
     return str(count)
 ```
 
-**Callback Managers:**
+**回调管理器:**
 
-Tools inject CallbackManager/AsyncCallbackManager to enable:
-- Custom event handlers (logging, metrics, tracing)
-- Nested tool execution with callback propagation
-- on_tool_start/on_tool_end hooks for observability
+工具注入 CallbackManager/AsyncCallbackManager 以支持:
+- 自定义事件处理器(日志、指标、追踪)
+- 带回调传播的嵌套工具执行
+- 用于可观测性的 on_tool_start/on_tool_end 钩子
 
-Tools expose run_manager in `_run()` signature to allow direct callback invocation.
+工具在 `_run()` 签名中暴露 run_manager,允许直接调用回调。
 
-## Configuration and Operational Concerns
+## 配置与运维注意事项
 
-**Reserved Parameter Names:**
+**保留参数名:**
 
-Parameters named `config`, `run_manager`, or `callbacks` are filtered from the tool schema because they conflict with LangChain's runtime injection. Use `ToolRuntime` annotation to access runtime state instead.
+名为 `config`、`run_manager` 或 `callbacks` 的参数会从工具 schema 中过滤,因为它们与 LangChain 的运行时注入冲突。要访问运行时状态请改用 `ToolRuntime` 注解。
 
-**Provider Extras:**
+**供应商 extras:**
 
-The `extras` dict allows passing provider-specific configuration:
+`extras` 字典可传供应商专属配置:
 
 ```python
 @tool(extras={"cache_control": {"type": "ephemeral"}})
@@ -475,11 +479,11 @@ def cached_operation(query: str) -> str:
     return query
 ```
 
-Chat models inspect extras and apply provider-specific behavior when rendering tools.
+聊天模型在渲染工具时检查 extras 并应用供应商专属行为。
 
-**Docstring Parsing:**
+**Docstring 解析:**
 
-When `parse_docstring=True`, Google-style docstrings are parsed for parameter descriptions:
+`parse_docstring=True` 时,解析 Google 风格 docstring 提取参数描述:
 
 ```python
 @tool(parse_docstring=True)
@@ -493,18 +497,18 @@ def process(name: str, count: int) -> str:
     return f"{name}: {count}"
 ```
 
-Invalid docstrings (missing Args section, args not in signature, malformed) raise ValueError if `error_on_invalid_docstring=True`.
+若 `error_on_invalid_docstring=True`,无效 docstring(缺 Args 小节、参数不在签名中、格式错误)会抛 ValueError。
 
-**Verbose Output:**
+**Verbose 输出:**
 
-Set `verbose=True` to log tool execution. Combined with callback managers for comprehensive observability.
+设 `verbose=True` 记录工具执行。配合回调管理器实现全面可观测。
 
-## Summary: When to Use Each Pattern
+## 总结:各模式适用场景
 
-- **@tool decorator:** Primary pattern for converting functions to tools; use with type hints for automatic schema inference
-- **StructuredTool.from_function():** Direct factory when decorator syntax isn't convenient or for programmatic tool creation
-- **Tool (simple):** Legacy compatibility or single-string-input tools
-- **BaseToolkit:** Organizing related tools or dynamic tool generation
-- **convert_runnable_to_tool():** Wrapping existing Runnables as tools with consistent invocation
-- **Injected arguments:** Share runtime context (state, store, call IDs) without model visibility
-- **Custom error handlers:** Transform Pydantic or tool errors into user-friendly messages for agents
+- **@tool 装饰器:** 函数转工具的首选;配合类型标注自动推断 schema
+- **StructuredTool.from_function():** 装饰器语法不便或需要编程式创建工具时的直接工厂
+- **Tool(简单):** 遗留兼容或单字符串输入工具
+- **BaseToolkit:** 组织相关工具或动态生成工具
+- **convert_runnable_to_tool():** 把既有 Runnable 包装为调用一致的实践工具
+- **注入参数:** 共享运行时上下文(state、store、call ID)且对模型不可见
+- **自定义错误处理器:** 把 Pydantic 或工具错误转换为对智能体友好的消息

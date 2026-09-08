@@ -18,37 +18,41 @@ sources:
 generated: { by: "openwiki/0.5.0", at: "2026-09-03T15:18:34.589Z" }
 ---
 
-## Overview
+> 🌐 本文档由 [langchain-ai/langchain](https://github.com/langchain-ai/langchain) 翻译,英文原版见原项目。
+>
+> ⚠️ 原文超过 10000 字符,本页翻译核心章节;代码块、行号引用保持原样,完整细节见英文原版。
 
-The **chat model system** is the core interface for integrating large language models into LangChain applications. `BaseChatModel` is the abstract protocol that all chat model implementations inherit from. It defines the contract for synchronous and asynchronous invoke/streaming behavior, callback integration, rate limiting, structured output binding, and capability discovery via model profiles.
+## 总览
 
-Chat models convert conversational message history into AI responses, supporting both simple generation (`invoke`) and streaming output (`stream`). The framework unifies sync/async patterns, handles caching transparently, routes to streaming or non-streaming backends based on configuration and attached callbacks, and provides extension points for custom behavior via method overrides.
+**聊天模型系统**是把大语言模型接入 LangChain 应用的核心接口。`BaseChatModel` 是所有聊天模型实现继承的抽象协议,定义了同步/异步 invoke 与流式行为、回调集成、限流、结构化输出绑定,以及通过模型画像进行能力发现的契约。
 
-## Core Interface: BaseChatModel
+聊天模型把对话消息历史转换为 AI 响应,同时支持简单生成(`invoke`)与流式输出(`stream`)。框架统一了同步/异步模式,透明处理缓存,依据配置和挂载的回调路由到流式或非流式后端,并通过方法重写提供自定义行为的扩展点。
 
-**Location**: `repo://libs/core/langchain_core/language_models/chat_models.py#L284-L2400`
+## 核心接口:BaseChatModel
 
-`BaseChatModel` inherits from `BaseLanguageModel[AIMessage]` and is a `Runnable` that accepts `LanguageModelInput` and produces `AIMessage` outputs. It is designed for subclassing; implementations must override `_generate` (required) and optionally `_llm_type`, `_stream`, and `_agenerate`.
+**位置**:`repo://libs/core/langchain_core/language_models/chat_models.py#L284-L2400`
 
-### Input and Output Types
+`BaseChatModel` 继承自 `BaseLanguageModel[AIMessage]`,是一个接受 `LanguageModelInput`、产出 `AIMessage` 的 `Runnable`。它为继承而设计:实现必须重写 `_generate`(必需),可选重写 `_llm_type`、`_stream`、`_agenerate`。
 
-**LanguageModelInput** (`repo://libs/core/langchain_core/language_models/base.py#L140`) is a union type:
+### 输入与输出类型
+
+**LanguageModelInput**(`repo://libs/core/langchain_core/language_models/base.py#L140`)是一个联合类型:
 
 ```python
 LanguageModelInput = PromptValue | str | Sequence[MessageLikeRepresentation]
 ```
 
-- **string**: Converted to a `StringPromptValue` (simple user message)
-- **list of messages**: Converted to a `ChatPromptValue` (full conversation history)
-- **PromptValue**: Already a structured prompt (passed through)
+- **字符串**:转换为 `StringPromptValue`(简单用户消息)
+- **消息列表**:转换为 `ChatPromptValue`(完整对话历史)
+- **PromptValue**:本身已是结构化提示(直接透传)
 
-The `_convert_input` method normalizes all input forms to a `PromptValue` for downstream processing.
+`_convert_input` 方法把所有输入形式规范化为 `PromptValue` 供下游处理。
 
-**Output**: All invoke/stream methods return `AIMessage` or `AIMessageChunk` (for streaming). Chat results are wrapped in `ChatGeneration` objects (holding message + generation metadata) aggregated into `ChatResult`.
+**输出**:所有 invoke/stream 方法返回 `AIMessage`(流式为 `AIMessageChunk`)。聊天结果包装在 `ChatGeneration` 对象(含消息与生成元数据)中,聚合成 `ChatResult`。
 
-### Synchronous Methods
+### 同步方法
 
-**`invoke`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L474-L499`) is the primary synchronous entrypoint:
+**`invoke`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L474-L499`)是主要的同步入口:
 
 ```python
 def invoke(
@@ -61,12 +65,12 @@ def invoke(
 ) -> AIMessage
 ```
 
-- Converts input to `PromptValue`, then to messages
-- Calls `generate_prompt` (which internally calls `_generate_with_cache`)
-- Extracts and returns the first generation's message
-- Propagates `run_id`, callbacks, tags, and metadata from config
+- 把输入转为 `PromptValue`,再转为消息
+- 调用 `generate_prompt`(内部调用 `_generate_with_cache`)
+- 提取并返回第一个生成的消息
+- 从 config 传播 `run_id`、callbacks、tags 与 metadata
 
-**`stream`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L726-L856`) yields `AIMessageChunk` objects as they arrive:
+**`stream`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L726-L856`)随数据到达逐个产出 `AIMessageChunk`:
 
 ```python
 def stream(
@@ -79,17 +83,17 @@ def stream(
 ) -> Iterator[AIMessageChunk]
 ```
 
-- Checks if streaming is enabled and implemented via `_should_stream()`
-- Falls back to `invoke` if streaming is disabled or not implemented
-- For streaming-enabled models, calls `_stream()` directly and yields chunks
-- Wraps output in callback lifecycle: `on_chat_model_start`, `on_llm_new_token` (per chunk), `on_llm_end` or `on_llm_error`
-- Applies rate limiting if configured
-- Normalizes messages and handles streaming-specific output formatting (e.g., `output_version="v1"`)
-- Yields a final empty chunk with `chunk_position="last"` when streaming completes
+- 通过 `_should_stream()` 判断是否启用且实现了流式
+- 流式被禁用或未实现时回退到 `invoke`
+- 对支持流式的模型,直接调用 `_stream()` 并逐块产出
+- 输出包在回调生命周期里:`on_chat_model_start`、`on_llm_new_token`(每块)、`on_llm_end` 或 `on_llm_error`
+- 配置了限流器则应用限流
+- 规范化消息并处理流式特有的输出格式(如 `output_version="v1"`)
+- 流式结束时产出 `chunk_position="last"` 的最终空块
 
-### Asynchronous Methods
+### 异步方法
 
-**`ainvoke`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L501-L523`) is the async variant:
+**`ainvoke`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L501-L523`)是异步变体:
 
 ```python
 async def ainvoke(
@@ -102,10 +106,10 @@ async def ainvoke(
 ) -> AIMessage
 ```
 
-- Awaits `agenerate_prompt`
-- Otherwise mirrors `invoke` behavior
+- 等待 `agenerate_prompt`
+- 其余行为与 `invoke` 一致
 
-**`astream`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L857-L990`) is the async streaming variant:
+**`astream`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L857-L990`)是异步流式变体:
 
 ```python
 async def astream(
@@ -118,14 +122,14 @@ async def astream(
 ) -> AsyncIterator[AIMessageChunk]
 ```
 
-- Checks `_should_stream(async_api=True)` to route to `_astream` or fallback
-- Otherwise mirrors `stream` behavior with async callback dispatch
+- 检查 `_should_stream(async_api=True)` 以路由到 `_astream` 或回退
+- 其余与 `stream` 一致,但用异步回调分发
 
-## Streaming Architecture
+## 流式架构
 
-### Stream Decision Logic
+### 流式决策逻辑
 
-**`_should_stream()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L549-L585`) determines whether to use the streaming code path:
+**`_should_stream()`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L549-L585`)决定是否走流式代码路径:
 
 ```python
 def _should_stream(
@@ -137,23 +141,23 @@ def _should_stream(
 ) -> bool
 ```
 
-Returns `True` if:
-1. Streaming is not disabled (`_streaming_disabled()` returns `False`)
-2. Streaming method is implemented for the requested variant (sync/async)
-3. Any of these are true:
-   - Explicit `stream=True` kwarg
-   - Instance-level `streaming=True` attribute
-   - A v1-style `_StreamingCallbackHandler` is attached
+满足以下条件返回 `True`:
+1. 流式未被禁用(`_streaming_disabled()` 返回 `False`)
+2. 对应变体(同步/异步)实现了流式方法
+3. 以下任一成立:
+   - 显式传入 `stream=True` kwarg
+   - 实例级 `streaming=True` 属性
+   - 挂载了 v1 风格的 `_StreamingCallbackHandler`
 
-Returns `False` (fallback to non-streaming) if:
-- `disable_streaming=True` (hard disable)
-- `disable_streaming="tool_calling"` and tools are provided
-- `stream=False` explicitly
-- Streaming is not implemented and async falls back to sync
+以下情况返回 `False`(回退非流式):
+- `disable_streaming=True`(硬禁用)
+- `disable_streaming="tool_calling"` 且传入了工具
+- 显式 `stream=False`
+- 流式未实现且异步回退到同步
 
-### Stream Implementation Methods
+### 流式实现方法
 
-**`_stream()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L2255-L2273`) is the sync streaming hook (optional override):
+**`_stream()`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L2255-L2273`)是同步流式钩子(可选重写):
 
 ```python
 def _stream(
@@ -165,11 +169,11 @@ def _stream(
 ) -> Iterator[ChatGenerationChunk]
 ```
 
-- Subclasses override to implement native streaming
-- Default raises `NotImplementedError` (fallback to `_generate`)
-- Receives run_manager for per-token callbacks
+- 子类重写以实现原生流式
+- 默认抛 `NotImplementedError`(回退到 `_generate`)
+- 接收 run_manager 以逐 token 触发回调
 
-**`_astream()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L2275-L2311`) is the async streaming hook (optional override):
+**`_astream()`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L2275-L2311`)是异步流式钩子(可选重写):
 
 ```python
 async def _astream(
@@ -181,28 +185,28 @@ async def _astream(
 ) -> AsyncIterator[ChatGenerationChunk]
 ```
 
-- Default implementation runs `_stream()` in an executor and yields results
-- Subclasses can override for native async streaming
+- 默认实现在 executor 中运行 `_stream()` 并产出结果
+- 子类可重写以实现原生异步流式
 
-### ChatModelStream and AsyncChatModelStream
+### ChatModelStream 与 AsyncChatModelStream
 
-**Location**: `repo://libs/core/langchain_core/language_models/chat_model_stream.py`
+**位置**:`repo://libs/core/langchain_core/language_models/chat_model_stream.py`
 
-For the v3 event protocol (`stream_events(version="v3")`), models return a `ChatModelStream` (sync) or `AsyncChatModelStream` (async) that expose **typed projections** for incremental content:
+对 v3 事件协议(`stream_events(version="v3")`),模型返回 `ChatModelStream`(同步)或 `AsyncChatModelStream`(异步),为增量内容暴露**类型化投影**:
 
-- **`.text`**: Accumulates text content blocks
-- **`.reasoning`**: Accumulates reasoning/chain-of-thought content
-- **`.tool_calls`**: Accumulates parsed tool call blocks
-- **`.usage`**: Accumulates token usage info
-- **`.output`**: Final assembled `AIMessage`
+- **`.text`**:累积文本内容块
+- **`.reasoning`**:累积推理/思维链内容
+- **`.tool_calls`**:累积解析后的工具调用块
+- **`.usage`**:累积 token 用量
+- **`.output`**:最终组装的 `AIMessage`
 
-Each projection can be iterated for deltas or awaited for the final value. Internally, these accumulators track incoming protocol events and merge them into structured output.
+每个投影都可迭代获取增量,或等待最终值。内部由累加器跟踪协议事件并合并为结构化输出。
 
-## Generation and Caching
+## 生成与缓存
 
-### Core Generation Methods
+### 核心生成方法
 
-**`_generate()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L2208-L2226`) is the **required abstract method** all subclasses must implement:
+**`_generate()`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L2208-L2226`)是所有子类**必须实现的抽象方法**:
 
 ```python
 @abstractmethod
@@ -215,12 +219,12 @@ def _generate(
 ) -> ChatResult
 ```
 
-- Calls the underlying model's API
-- Returns a `ChatResult` with a list of `ChatGeneration` objects
-- Must handle errors internally or propagate them
-- Receives normalized messages and a run manager for callbacks
+- 调用底层模型 API
+- 返回含 `ChatGeneration` 列表的 `ChatResult`
+- 内部处理错误或向上传播
+- 接收规范化后的消息与用于回调的 run manager
 
-**`_agenerate()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L2228-L2253`) is the optional async override:
+**`_agenerate()`**(`repo://libs/core/langchain_core/language_models/chat_models.py#L2228-L2253`)是可选的异步重写:
 
 ```python
 async def _agenerate(
@@ -232,21 +236,21 @@ async def _agenerate(
 ) -> ChatResult
 ```
 
-- Default implementation runs `_generate` in an executor
-- Subclasses override for native async API support
+- 默认实现在 executor 中运行 `_generate`
+- 子类重写以支持原生异步 API
 
-### Cached Generation
+### 缓存生成
 
-**`_generate_with_cache()`** and **`_agenerate_with_cache()`** wrap the core methods with:
+**`_generate_with_cache()`** 与 **`_agenerate_with_cache()`** 在核心方法外包装了:
 
-1. **Prompt caching**: Checks if `self.cache` or global `get_llm_cache()` has cached results for the input
-2. **Cache hits**: Returns cached generations and replays them as v2 events if a v2 handler is attached
-3. **Cache misses**: Routes through streaming or non-streaming path
-4. **Protocol routing**: Dispatches to v2 events (`_should_use_protocol_streaming`) or v1 callback path (`_should_stream`)
+1. **提示词缓存**:检查 `self.cache` 或全局 `get_llm_cache()` 是否已有该输入的缓存结果
+2. **缓存命中**:返回缓存的生成;若挂载 v2 处理器,则以 v2 事件形式重放
+3. **缓存未命中**:路由到流式或非流式路径
+4. **协议路由**:分发到 v2 事件(`_should_use_protocol_streaming`)或 v1 回调路径(`_should_stream`)
 
-### Batch Methods
+### 批量方法
 
-**`generate()`** and **`agenerate()`** accept a list of message lists and use internal caching/streaming to batch-process prompts:
+**`generate()`** 与 **`agenerate()`** 接受消息列表的列表,利用内部缓存/流式批量处理提示词:
 
 ```python
 def generate(
@@ -258,40 +262,40 @@ def generate(
 ) -> LLMResult
 ```
 
-Returns an `LLMResult` with generations grouped by input prompt and combined llm_output.
+返回 `LLMResult`,生成结果按输入提示词分组,并合并 llm_output。
 
-## Callback Lifecycle
+## 回调生命周期
 
-Chat models integrate with the callback system to emit structured events throughout execution:
+聊天模型与回调系统集成,在执行全程发出结构化事件:
 
-### LLM Run Lifecycle
+### LLM 运行生命周期
 
-1. **`on_chat_model_start`** (or fallback `on_llm_start`):
-   - Fires when `invoke`, `stream`, or `generate` begins
-   - Receives serialized model config, formatted input messages, invocation params, and batch size
-   - Returns run manager(s) bound to the operation
-   
-2. **`on_llm_new_token`** (streaming only):
-   - Fires once per streamed token/chunk
-   - Receives token string and `ChatGenerationChunk` metadata
-   - Allows real-time output capture
+1. **`on_chat_model_start`**(或回退 `on_llm_start`):
+   - `invoke`、`stream` 或 `generate` 开始时触发
+   - 接收序列化的模型配置、格式化后的输入消息、调用参数和批量大小
+   - 返回绑定到本次操作的 run manager
+    
+2. **`on_llm_new_token`**(仅流式):
+   - 每个流式 token/块触发一次
+   - 接收 token 字符串与 `ChatGenerationChunk` 元数据
+   - 支持实时输出捕获
 
 3. **`on_llm_end`**:
-   - Fires when generation completes successfully
-   - Receives final `LLMResult` with all generations and metadata
+   - 生成成功完成时触发
+   - 接收含全部生成与元数据的最终 `LLMResult`
 
 4. **`on_llm_error`**:
-   - Fires if generation raises an exception
-   - Receives the exception and partial `LLMResult` (if available)
-   - `_generate_response_from_error()` extracts response metadata from HTTP errors
+   - 生成抛异常时触发
+   - 接收异常和部分 `LLMResult`(如有)
+   - `_generate_response_from_error()` 从 HTTP 错误中提取响应元数据
 
-5. **`on_stream_event`** (v2/v3 protocol):
-   - Fires for each content-block protocol event during streaming
-   - Allows fine-grained event observation for advanced tracing
+5. **`on_stream_event`**(v2/v3 协议):
+   - 流式期间每个内容块协议事件触发
+   - 支持细粒度事件观察,用于高级追踪
 
-### Callback Configuration
+### 回调配置
 
-Callbacks are configured via `RunnableConfig`:
+回调通过 `RunnableConfig` 配置:
 
 ```python
 config = {
@@ -304,15 +308,15 @@ config = {
 result = model.invoke(input, config=config)
 ```
 
-Inheritable metadata and LangSmith params are extracted via `_get_invocation_params()` and `_get_ls_params()`.
+可继承的元数据和 LangSmith 参数通过 `_get_invocation_params()` 与 `_get_ls_params()` 提取。
 
-## Structured Output and Tool Binding
+## 结构化输出与工具绑定
 
 ### with_structured_output()
 
-**Location**: `repo://libs/core/langchain_core/language_models/chat_models.py#L2385-L2565`
+**位置**:`repo://libs/core/langchain_core/language_models/chat_models.py#L2385-L2565`
 
-`with_structured_output()` wraps a chat model to constrain output to a specified schema:
+`with_structured_output()` 包装聊天模型,把输出约束到指定 schema:
 
 ```python
 def with_structured_output(
@@ -324,20 +328,20 @@ def with_structured_output(
 ) -> Runnable[LanguageModelInput, dict[str, Any] | BaseModel]
 ```
 
-**How it works**:
+**工作原理**:
 
-1. Delegates to `bind_tools([schema], tool_choice="any", ...)`
-2. Chains the result through an output parser:
-   - If schema is a Pydantic class: `PydanticToolsParser` → Pydantic instance
-   - If schema is a dict: `JsonOutputKeyToolsParser` → dict
-3. If `include_raw=True`: Wraps output in `{"raw": AIMessage, "parsed": ..., "parsing_error": ...}`
-4. If parsing fails and `include_raw=False`: Raises exception
+1. 委托给 `bind_tools([schema], tool_choice="any", ...)`
+2. 把结果接入输出解析器:
+   - schema 是 Pydantic 类:`PydanticToolsParser` → Pydantic 实例
+   - schema 是 dict:`JsonOutputKeyToolsParser` → dict
+3. `include_raw=True`:输出包装为 `{"raw": AIMessage, "parsed": ..., "parsing_error": ...}`
+4. 解析失败且 `include_raw=False`:抛异常
 
-**Prerequisites**: Requires the model to implement `bind_tools()` (not all models support this).
+**前提**:要求模型实现 `bind_tools()`(并非所有模型都支持)。
 
 ### bind_tools()
 
-**Location**: `repo://libs/core/langchain_core/language_models/chat_models.py#L2366-L2383`
+**位置**:`repo://libs/core/langchain_core/language_models/chat_models.py#L2366-L2383`
 
 ```python
 def bind_tools(
@@ -349,16 +353,16 @@ def bind_tools(
 ) -> Runnable[LanguageModelInput, AIMessage]
 ```
 
-- Abstract method; must be implemented by subclasses that support tool calling
-- Binds a list of tools to the model
-- Returns a bound runnable that includes tool definitions in the API request
-- `tool_choice="any"` forces the model to call at least one tool
+- 抽象方法;支持工具调用的子类必须实现
+- 把工具列表绑定到模型
+- 返回一个在 API 请求中携带工具定义的绑定 runnable
+- `tool_choice="any"` 强制模型至少调用一个工具
 
-## Model Profiles and Capabilities
+## 模型画像与能力
 
-**Location**: `repo://libs/core/langchain_core/language_models/model_profile.py`
+**位置**:`repo://libs/core/langchain_core/language_models/model_profile.py`
 
-The `profile` field on `BaseChatModel` holds metadata about model capabilities:
+`BaseChatModel` 的 `profile` 字段保存模型能力元数据:
 
 ```python
 class ModelProfile(TypedDict, total=False):
@@ -399,15 +403,15 @@ class ModelProfile(TypedDict, total=False):
     attachment: bool  # Supports file attachments?
 ```
 
-**Auto-loading**: Profiles are resolved via `_resolve_model_profile()` (subclass override) and cached in the `profile` field. Unrecognized keys trigger a warning via `_warn_unknown_profile_keys()`.
+**自动加载**:画像通过 `_resolve_model_profile()`(子类重写)解析并缓存在 `profile` 字段。无法识别的键会经 `_warn_unknown_profile_keys()` 触发警告。
 
-### Partner Pattern Integration
+### Partner 模式集成
 
-Partner packages (e.g., `langchain-openai`) override `_resolve_model_profile()` to load model-specific metadata from their own profile data. The base validator `_set_model_profile` (Pydantic mode="after") automatically populates the field if not explicitly set.
+Partner 包(如 `langchain-openai`)重写 `_resolve_model_profile()`,从自己的画像数据加载模型专属元数据。基类校验器 `_set_model_profile`(Pydantic mode="after")在未显式设置时自动填充该字段。
 
-## Configuration and State
+## 配置与状态
 
-### Core Fields
+### 核心字段
 
 ```python
 class BaseChatModel(BaseLanguageModel[AIMessage], ABC):
@@ -432,38 +436,42 @@ class BaseChatModel(BaseLanguageModel[AIMessage], ABC):
     metadata: dict[str, Any] | None = None
 ```
 
-### Required Properties
+- `disable_streaming`:`False` 表示可用时走流式;`True` 表示总是非流式(invoke);`"tool_calling"` 表示仅在传入工具时用非流式
+- `output_version`:`'v0'` 为供应商特有格式(经 content_blocks 惰性解析);`'v1'` 为标准化格式(合并进 content)
+- `profile`:能力元数据(未提供时自动加载)
 
-- **`_llm_type`** (property, abstract): Unique model type identifier (e.g., `"openai"`, `"anthropic"`)
-- **`_identifying_params`** (property, optional): Dict of model configuration for tracing (e.g., `{"model": "gpt-4", "temperature": 0.7}`)
+### 必需属性
 
-## Implementation Requirements
+- **`_llm_type`**(property,抽象):模型类型唯一标识(如 `"openai"`、`"anthropic"`)
+- **`_identifying_params`**(property,可选):用于追踪的模型配置字典(如 `{"model": "gpt-4", "temperature": 0.7}`)
 
-Subclasses must implement:
+## 实现要求
 
-| Method/Property | Description | Required | Notes |
+子类必须实现:
+
+| 方法/属性 | 说明 | 必需 | 备注 |
 |---|---|---|---|
-| `_generate()` | Core generation logic | ✓ | Calls provider API, returns `ChatResult` |
-| `_llm_type` | Model type identifier | ✓ | String like `"openai"`, `"anthropic"` |
-| `_identifying_params` | Config dict for tracing | ✗ | Used by `_get_llm_string()` and serialization |
-| `_stream()` | Sync streaming | ✗ | Optional; if not implemented, stream falls back to invoke |
-| `_agenerate()` | Native async generation | ✗ | Optional; defaults to running `_generate` in executor |
-| `_astream()` | Native async streaming | ✗ | Optional; defaults to running `_stream` in executor |
-| `bind_tools()` | Tool binding for structured output | ✗ | Required only if `with_structured_output()` is needed |
+| `_generate()` | 核心生成逻辑 | ✓ | 调用供应商 API,返回 `ChatResult` |
+| `_llm_type` | 模型类型标识 | ✓ | 如 `"openai"`、`"anthropic"` |
+| `_identifying_params` | 追踪用配置字典 | ✗ | 被 `_get_llm_string()` 与序列化使用 |
+| `_stream()` | 同步流式 | ✗ | 可选;未实现时 stream 回退到 invoke |
+| `_agenerate()` | 原生异步生成 | ✗ | 可选;默认在 executor 中运行 `_generate` |
+| `_astream()` | 原生异步流式 | ✗ | 可选;默认在 executor 中运行 `_stream` |
+| `bind_tools()` | 结构化输出的工具绑定 | ✗ | 仅当需要 `with_structured_output()` 时必需 |
 
-## Model Initialization
+## 模型初始化
 
-**Location**: `repo://libs/langchain_v1/langchain/chat_models/base.py` (v1 compat) and `langchain_core` partner packages
+**位置**:`repo://libs/langchain_v1/langchain/chat_models/base.py`(v1 兼容)及 langchain_core 各 partner 包
 
-Models are instantiated via:
+模型实例化方式:
 
-1. **Direct instantiation**: `ChatOpenAI(model="gpt-4", temperature=0)`
-2. **Factory function `init_chat_model()`**: Auto-detects provider and imports the class dynamically
-3. **Partner package exports**: Each provider (e.g., `langchain-openai`) exports a concrete model class
+1. **直接实例化**:`ChatOpenAI(model="gpt-4", temperature=0)`
+2. **工厂函数 `init_chat_model()`**:自动识别供应商并动态导入类
+3. **Partner 包导出**:每个供应商(如 `langchain-openai`)导出具体模型类
 
-The `init_chat_model()` function accepts a model name string (e.g., `"gpt-4"`, `"claude-3-sonnet"`) and optional `model_provider` to instantiate the correct class without explicit imports.
+`init_chat_model()` 接受模型名字符串(如 `"gpt-4"`、`"claude-3-sonnet"`)和可选 `model_provider`,无需显式导入即可实例化正确的类。
 
-## Example: Custom Chat Model
+## 示例:自定义聊天模型
 
 ```python
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -521,9 +529,9 @@ class MyCustomChatModel(BaseChatModel):
         }
 ```
 
-## Advanced Patterns
+## 高级模式
 
-### Streaming with Callbacks
+### 带回调的流式
 
 ```python
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
@@ -536,7 +544,7 @@ for chunk in model.stream("Tell me a joke", config=config):
     pass  # Handler prints as chunks arrive
 ```
 
-### Structured Output with Validation
+### 带校验的结构化输出
 
 ```python
 from pydantic import BaseModel
@@ -549,7 +557,7 @@ structured_model = model.with_structured_output(Answer)
 result = structured_model.invoke("What is 2+2?")  # -> Answer(text="4", confidence=0.99)
 ```
 
-### Caching and Rate Limiting
+### 缓存与限流
 
 ```python
 from langchain_core.caches import InMemoryCache
@@ -566,7 +574,7 @@ result1 = model.invoke("Hello")
 result2 = model.invoke("Hello")  # Cached, no API call
 ```
 
-### Conditional Streaming
+### 条件流式
 
 ```python
 model_with_fallback = ChatOpenAI().with_fallbacks([ChatAnthropic()])
@@ -576,20 +584,20 @@ config = {"callbacks": [MyStreamingHandler()]}
 model_with_fallback.invoke("Prompt", config=config)
 ```
 
-## Key Invariants and Guarantees
+## 关键不变量与保证
 
-1. **Input normalization**: All input forms (string, message list, PromptValue) are normalized to messages before `_generate`/`_stream` are called.
+1. **输入规范化**:所有输入形式(字符串、消息列表、PromptValue)在调用 `_generate`/`_stream` 前都规范化为消息。
 
-2. **Message IDs**: Each streamed message chunk and final message gets a unique ID (derived from run_id) for tracing.
+2. **消息 ID**:每个流式消息块和最终消息都有唯一 ID(派生自 run_id)用于追踪。
 
-3. **Callback ordering**: Callbacks fire in order: `on_chat_model_start` → `on_llm_new_token` (per chunk) → `on_llm_end` or `on_llm_error`.
+3. **回调顺序**:回调按序触发:`on_chat_model_start` → `on_llm_new_token`(每块)→ `on_llm_end` 或 `on_llm_error`。
 
-4. **Streaming fallback**: If streaming is not implemented or disabled, `stream` seamlessly falls back to `invoke` and yields the result as a single chunk.
+4. **流式回退**:流式未实现或被禁用时,`stream` 无缝回退到 `invoke`,把结果作为单个块产出。
 
-5. **Cache transparency**: Cache hits are completely transparent—same lifecycle callbacks fire as for cache misses.
+5. **缓存透明**:缓存命中完全透明 —— 触发的生命周期回调与未命中相同。
 
-6. **Async/sync equivalence**: Async methods mirror sync behavior; default async implementations run sync methods in an executor.
+6. **异步/同步等价**:异步方法镜像同步行为;默认异步实现在 executor 中运行同步方法。
 
-7. **Response metadata**: Each generation accumulates metadata (tokens, finish_reason, etc.) in `message.response_metadata`.
+7. **响应元数据**:每个生成把元数据(token、finish_reason 等)累积在 `message.response_metadata`。
 
-8. **Error handling**: Exceptions during generation trigger `on_llm_error` and propagate to the caller; error metadata is extracted from HTTP responses if available.
+8. **错误处理**:生成期间的异常触发 `on_llm_error` 并向调用方传播;如可用,会从 HTTP 响应中提取错误元数据。
