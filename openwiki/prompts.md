@@ -28,29 +28,33 @@ sources:
 generated: { by: "openwiki/0.5.0", at: "2026-09-03T15:18:34.589Z" }
 ---
 
-## Overview
+> 🌐 本文档由 [langchain-ai/langchain](https://github.com/langchain-ai/langchain) 翻译,英文原版见原项目。
+>
+> ⚠️ 原文超过 10000 字符,本页翻译核心章节;代码块保持原样,完整细节见英文原版。
 
-LangChain's **prompt templating system** provides a flexible, composable way to construct messages for language models. Prompts accept input variables, format them into message sequences, and optionally parse structured output. The system distinguishes between **string templates** (for raw text) and **chat templates** (sequences of typed messages). **Few-shot prompt templates** add the capability to select and inject examples dynamically, teaching models by demonstration.
+## 总览
 
-## Fundamental Concepts
+LangChain 的**提示词模板系统**提供了灵活、可组合的方式来为语言模型构造消息。提示词接受输入变量,把它们格式化为消息序列,并可选地解析结构化输出。系统区分**字符串模板**(原始文本)与**聊天模板**(类型化消息序列)。**Few-shot 提示词模板**增加了动态挑选并注入示例的能力,以示范方式教模型。
 
-### Prompt Types
+## 基础概念
 
-LangChain provides two main categories of prompts:
+### 提示词类型
 
-#### PromptTemplate (StringPromptTemplate)
+LangChain 提供两大类提示词:
 
-A `PromptTemplate` wraps a single string template with variable placeholders. The template is formatted using one of three engines:
+#### PromptTemplate(StringPromptTemplate)
 
-- **f-string** (default): Python f-string syntax. Fast, supports arbitrary expressions in `{...}` brackets with proper escaping via `{{` and `}}`.
-- **mustache**: Mustache syntax using `{{variable}}`. Safer for user-controlled templates.
-- **jinja2**: Full Jinja2 templating. Supports conditionals, loops, and filters, but poses security risks if templates come from untrusted sources; LangChain uses `SandboxedEnvironment` by default for defense-in-depth.
+`PromptTemplate` 包装带变量占位符的单个字符串模板,格式化引擎三选一:
 
-**Key properties:**
-- `template`: The template string.
-- `input_variables`: List of variable names that must be provided during formatting.
-- `partial_variables`: Pre-filled variables; reduce required inputs when formatting.
-- `template_format`: Which engine to use (`f-string`, `mustache`, or `jinja2`).
+- **f-string**(默认):Python f-string 语法。快,`{...}` 内支持任意表达式,`{{`/`}}` 转义。
+- **mustache**:Mustache 语法,`{{variable}}`。对用户可控模板更安全。
+- **jinja2**:完整 Jinja2 模板。支持条件、循环和过滤器,但若模板来自不可信来源有安全风险;LangChain 默认用 `SandboxedEnvironment` 做纵深防御。
+
+**关键属性:**
+- `template`:模板字符串。
+- `input_variables`:格式化时必须提供的变量名列表。
+- `partial_variables`:预填变量;减少格式化所需输入。
+- `template_format`:使用哪个引擎(`f-string`、`mustache` 或 `jinja2`)。
 
 ```python
 from langchain_core.prompts import PromptTemplate
@@ -78,9 +82,9 @@ result = prompt.format(topic="AI")  # name is already set
 
 #### ChatPromptTemplate
 
-A `ChatPromptTemplate` sequences message prompt templates into a conversation structure. Each message has a role (system, human, ai, tool, etc.) and content. This aligns with the message-based API of chat models like GPT-4 and Claude.
+`ChatPromptTemplate` 把消息提示词模板串成对话结构。每条消息有角色(system、human、ai、tool 等)和内容。这与 GPT-4、Claude 等聊天模型基于消息的 API 对齐。
 
-**Constructor patterns:**
+**构造模式:**
 
 ```python
 from langchain_core.prompts import ChatPromptTemplate
@@ -100,23 +104,23 @@ template = ChatPromptTemplate([
 ])
 ```
 
-Supported message types in the shorthand syntax:
+简写语法支持的消息类型:
 - `"system"` → `SystemMessagePromptTemplate`
 - `"human"` → `HumanMessagePromptTemplate`
 - `"ai"` → `AIMessagePromptTemplate`
-- `"user"` → Alias for `"human"`
-- `"assistant"` → Alias for `"ai"`
+- `"user"` → `"human"` 别名
+- `"assistant"` → `"ai"` 别名
 - `"tool"` / `"function"` → `ToolMessagePromptTemplate` / `FunctionMessagePromptTemplate`
-- `"placeholder"` → `MessagesPlaceholder` for dynamic message lists
+- `"placeholder"` → `MessagesPlaceholder`,用于动态消息列表
 
-**Key methods:**
-- `format_messages(**kwargs)`: Returns a list of `BaseMessage` objects.
-- `invoke(dict)`: Runnable interface, returns `ChatPromptValue` containing formatted messages.
-- `format(**kwargs)`: Converts message list to a single string (useful for debugging or non-chat APIs).
+**关键方法:**
+- `format_messages(**kwargs)`:返回 `BaseMessage` 对象列表。
+- `invoke(dict)`:Runnable 接口,返回含格式化消息的 `ChatPromptValue`。
+- `format(**kwargs)`:把消息列表转成单个字符串(调试或非聊天 API 有用)。
 
 #### MessagesPlaceholder
 
-A `MessagesPlaceholder` injects a pre-formatted list of messages at a specific point in the prompt. This is essential for maintaining conversation history.
+`MessagesPlaceholder` 在提示词的特定位置注入一份预先格式化的消息列表,是维护对话历史的关键。
 
 ```python
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -138,11 +142,11 @@ result = template.invoke({
 # Messages: [system, human, ai, human]
 ```
 
-The `optional=True` flag allows the placeholder to be omitted from inputs; if not provided, an empty list is substituted. The `n_messages` parameter limits how many recent messages are included (useful for token budgets).
+`optional=True` 允许省略该占位符;未提供时以空列表代替。`n_messages` 参数限制纳入多少条最近消息(对 token 预算有用)。
 
-### Template Variable Substitution
+### 模板变量替换
 
-Prompts automatically detect variable names from template syntax and require them at format time.
+提示词自动从模板语法检测变量名,并在格式化时要求提供。
 
 ```python
 from langchain_core.prompts import PromptTemplate
@@ -157,7 +161,7 @@ except KeyError as e:
     print(f"Error: {e}")
 ```
 
-**Partial application** pre-fills some variables, reducing the required input set:
+**偏应用(partial)**预填部分变量,缩小必填集合:
 
 ```python
 prompt = PromptTemplate.from_template("User: {name}, Question: {question}")
@@ -166,7 +170,7 @@ output = partial_prompt.format(question="How are you?")
 # Only 'question' is required now
 ```
 
-When a prompt has exactly **one** input variable, the template can accept a non-dict argument directly:
+当提示词**只有一个**输入变量时,模板可直接接受非字典参数:
 
 ```python
 template = ChatPromptTemplate.from_messages([
@@ -176,33 +180,33 @@ template = ChatPromptTemplate.from_messages([
 result = template.invoke("Hello!")  # Auto-wraps as {"input": "Hello!"}
 ```
 
-## Few-Shot Prompt Templates
+## Few-Shot 提示词模板
 
-Few-shot learning teaches models by providing input-output examples before the user's actual query. LangChain provides two patterns: one for string prompts and one for chat-based prompts.
+Few-shot 学习在用户真实提问之前提供输入-输出示例来教模型。LangChain 提供两种模式:字符串提示词版和聊天版。
 
 ### FewShotPromptTemplate
 
-`FewShotPromptTemplate` formats examples into a single string prompt.
+`FewShotPromptTemplate` 把示例格式化进单个字符串提示词。
 
-**Structure:**
+**结构:**
 ```
-[prefix]
+[前缀]
 
-[formatted example 1]
+[格式化示例 1]
 
-[formatted example 2]
+[格式化示例 2]
 
 ...
 
-[suffix]
+[后缀]
 ```
 
-**Components:**
-- `prefix`: Text before examples (optional).
-- `example_prompt`: A `PromptTemplate` specifying how each example is formatted.
-- `examples` or `example_selector`: Source of examples (either a fixed list or dynamic selector).
-- `suffix`: Text after examples. Usually contains the actual task and placeholders for the new input.
-- `example_separator`: String joining prefix, examples, and suffix (default: `"\n\n"`).
+**组成:**
+- `prefix`:示例前文本(可选)。
+- `example_prompt`:规定每个示例如何格式化的 `PromptTemplate`。
+- `examples` 或 `example_selector`:示例来源(固定列表或动态选择器)。
+- `suffix`:示例后文本。通常包含实际任务和新输入的占位符。
+- `example_separator`:连接前缀、示例和后缀的字符串(默认 `"\n\n"`)。
 
 ```python
 from langchain_core.prompts import PromptTemplate, FewShotPromptTemplate
@@ -238,7 +242,7 @@ output = prompt.format(input="big")
 
 ### FewShotChatMessagePromptTemplate
 
-`FewShotChatMessagePromptTemplate` embeds examples as message pairs within a chat sequence.
+`FewShotChatMessagePromptTemplate` 把示例作为消息对嵌入聊天序列。
 
 ```python
 from langchain_core.prompts import (
@@ -271,13 +275,13 @@ result = template.invoke({"input": "4+4"})
 # Messages: [system, human(2+2?), ai(4), human(2+3?), ai(5), human(4+4?)]
 ```
 
-## Example Selectors
+## 示例选择器
 
-Instead of using a fixed list of examples, an **example selector** dynamically picks relevant examples based on the input. This optimizes prompt length and relevance.
+**示例选择器**不用固定列表,而是按输入动态挑选相关示例,优化提示词长度与相关性。
 
-### BaseExampleSelector Interface
+### BaseExampleSelector 接口
 
-All selectors implement:
+所有选择器实现:
 
 ```python
 class BaseExampleSelector:
@@ -290,7 +294,7 @@ class BaseExampleSelector:
 
 ### SemanticSimilarityExampleSelector
 
-Embeds examples and input into a vector space, retrieving the `k` most similar examples. Requires a `VectorStore` and embeddings model.
+把示例和输入嵌入向量空间,检索最相似的 `k` 个示例。需要 `VectorStore` 和 embeddings 模型。
 
 ```python
 from langchain_core.example_selectors import SemanticSimilarityExampleSelector
@@ -331,16 +335,16 @@ prompt = FewShotPromptTemplate(
 output = prompt.format(input="bright")
 ```
 
-**Key parameters:**
-- `vectorstore`: VectorStore containing embedded examples.
-- `k`: Number of examples to return (default: 4).
-- `input_keys`: Optional filter to use only specific keys for similarity search (e.g., only the "input" field, not "output").
-- `example_keys`: Optional filter to include only certain keys in returned examples.
-- `vectorstore_kwargs`: Extra arguments passed to the vectorstore's `similarity_search` method.
+**关键参数:**
+- `vectorstore`:存放已嵌入示例的 VectorStore。
+- `k`:返回的示例数(默认 4)。
+- `input_keys`:可选过滤,只用特定键做相似度搜索(如只用 "input" 字段,不用 "output")。
+- `example_keys`:可选过滤,只保留返回示例的某些键。
+- `vectorstore_kwargs`:传给向量库 `similarity_search` 的额外参数。
 
 ### LengthBasedExampleSelector
 
-Selects examples greedily up to a maximum token/word count, preventing prompt length overflow. Useful when token budgets are tight.
+贪心地选择示例直到达到最大 token/词数,防止提示词超长。token 预算紧张时有用。
 
 ```python
 from langchain_core.example_selectors import LengthBasedExampleSelector
@@ -375,16 +379,16 @@ prompt = FewShotPromptTemplate(
 output = prompt.format(input="fast")
 ```
 
-**Key parameters:**
-- `examples`: List of all available examples.
-- `max_length`: Maximum prompt length (tokens or words, determined by `get_text_length`).
-- `get_text_length`: Function to measure prompt length; defaults to word count via regex.
+**关键参数:**
+- `examples`:全部可用示例。
+- `max_length`:最大提示词长度(token 或词,由 `get_text_length` 决定)。
+- `get_text_length`:测量提示词长度的函数;默认按正则词数。
 
-**Behavior:** Examples are iterated in order; the selector stops adding when the next example would exceed `max_length`. This is greedy, not optimal, but fast and predictable.
+**行为:** 按顺序迭代示例;下一个示例会超过 `max_length` 时停止添加。贪心而非最优,但快速且可预测。
 
-## Structured Output Prompts
+## 结构化输出提示词
 
-The `StructuredPrompt` (beta) combines a `ChatPromptTemplate` with a Pydantic schema, enabling the model to produce JSON output matching a specific schema.
+`StructuredPrompt`(beta)把 `ChatPromptTemplate` 与 Pydantic schema 结合,让模型产出符合指定 schema 的 JSON。
 
 ```python
 from pydantic import BaseModel
@@ -407,11 +411,11 @@ template = StructuredPrompt.from_messages_and_schema(
 result = template.invoke({"input": "What is LangChain?"})
 ```
 
-This is useful for tasks requiring consistent, parseable output (e.g., fact extraction, data classification).
+适合要求输出一致、可解析的任务(如事实抽取、数据分类)。
 
-## Runnable Interface and Chaining
+## Runnable 接口与链接
 
-All prompts inherit from `RunnableSerializable`, making them compatible with LangChain's chain-building system.
+所有提示词继承 `RunnableSerializable`,与 LangChain 链构建系统兼容。
 
 ```python
 from langchain_core.prompts import ChatPromptTemplate
@@ -433,15 +437,15 @@ result = chain.invoke({"topic": "the internet"})
 print(result)
 ```
 
-**Key methods:**
-- `invoke(dict) -> PromptValue`: Synchronous formatting.
-- `ainvoke(dict) -> PromptValue`: Asynchronous formatting.
-- `stream(dict)`: Streaming mode (rarely used for prompts, more common downstream).
-- `batch(list[dict])`: Batch formatting multiple inputs.
+**关键方法:**
+- `invoke(dict) -> PromptValue`:同步格式化。
+- `ainvoke(dict) -> PromptValue`:异步格式化。
+- `stream(dict)`:流式模式(提示词很少用,下游更常见)。
+- `batch(list[dict])`:批量格式化多个输入。
 
-## Prompt Composition
+## 提示词组合
 
-Prompts compose via the `+` operator, merging messages and variables.
+提示词用 `+` 运算符组合,合并消息与变量。
 
 ```python
 from langchain_core.prompts import ChatPromptTemplate
@@ -464,17 +468,15 @@ combined = system + conversation
 result = combined.invoke({"bot_name": "Alice", "user_input": "Hello!"})
 ```
 
-**Rules:**
-- When combining `ChatPromptTemplate` instances, messages are concatenated.
-- Input variables from both templates are merged.
-- Partial variables are merged; conflicting keys raise an error.
-- Templates must have compatible formats (both f-string, both mustache, etc.).
+**规则:**
+- 组合 `ChatPromptTemplate` 时,消息拼接。
+- 两个模板的输入变量合并。
+- partial 变量合并;键冲突报错。
+- 模板格式必须兼容(都用 f-string、都用 mustache 等)。
 
-## Prompt Loading from Files
+## 从文件加载提示词
 
-**Note:** Prompt serialization and loading via the old `save()` / `load_prompt_from_config()` API is deprecated in favor of using `dumpd()` / `loads()` from `langchain_core.load`.
-
-To load a prompt from a JSON or YAML file, use the modern LangChain serialization API:
+**注意:** 经旧的 `save()` / `load_prompt_from_config()` API 做提示词序列化与加载已弃用,推荐使用 `langchain_core.load` 的 `dumpd()` / `loads()`。
 
 ```python
 from langchain_core.load import loads
@@ -487,7 +489,7 @@ prompt = loads(prompt_dict)
 # Returns a deserialized PromptTemplate or ChatPromptTemplate
 ```
 
-Prompts can be serialized to JSON using `dumpd()` from `langchain_core.load`, enabling version control and sharing:
+提示词可用 `langchain_core.load` 的 `dumpd()` 序列化为 JSON,便于版本管理与共享:
 
 ```python
 from langchain_core.load import dumpd
@@ -502,9 +504,9 @@ prompt_dict = dumpd(prompt)
 # Contains nested structure compatible with loads()
 ```
 
-## Integration with Agent Factory
+## 与 Agent Factory 集成
 
-Prompts are a core input to the **Agent Factory** (`create_agent`), providing the conversational context for agent reasoning and tool use.
+提示词是 **Agent Factory**(`create_agent`)的核心输入,为智能体推理和工具使用提供对话上下文。
 
 ```python
 from langchain.agents import create_agent
@@ -522,13 +524,13 @@ agent = create_agent(
 )
 ```
 
-The agent factory internally compiles prompts with the model and tool bindings, managing message flow through the state machine. Middleware can intercept and modify prompts before model invocation via the `wrap_model_call` hook, enabling use cases like prompt optimization or safety filters.
+智能体工厂内部把提示词与模型、工具绑定一起编译,经状态机管理消息流。中间件可通过 `wrap_model_call` 钩子在模型调用前拦截并修改提示词,支持提示词优化或安全过滤等用例。
 
-## Security Considerations
+## 安全注意事项
 
-### Template Injection
+### 模板注入
 
-When constructing prompts from user input, use **partial variables** or **input variables** instead of string concatenation:
+从用户输入构造提示词时,用**partial 变量**或**输入变量**,不要字符串拼接:
 
 ```python
 # UNSAFE: Vulnerable to prompt injection
@@ -541,13 +543,13 @@ prompt = PromptTemplate.from_template("User said: {user_input}")
 output = prompt.format(user_input=user_input)
 ```
 
-### Jinja2 Sandboxing
+### Jinja2 沙箱
 
-When using Jinja2 templates, LangChain applies `SandboxedEnvironment` by default, blocking access to dunder attributes (`__class__`, `__globals__`, etc.). However:
+使用 Jinja2 模板时,LangChain 默认应用 `SandboxedEnvironment`,阻止访问双下划线属性(`__class__`、`__globals__` 等)。但:
 
-- **Do not accept Jinja2 templates from untrusted sources.** Sandboxing is best-effort, not foolproof.
-- Regular method calls and attribute access are still allowed (e.g., `obj.method()`).
-- If you must use Jinja2, prefer `f-string` or `mustache` for untrusted inputs.
+- **不要接受不可信来源的 Jinja2 模板。** 沙箱是尽力而为,并非万无一失。
+- 普通方法调用与属性访问仍然允许(如 `obj.method()`)。
+- 必须用 Jinja2 时,对不可信输入优先 `f-string` 或 `mustache`。
 
 ```python
 # Safe: f-string template from user, validated at construction time
@@ -558,9 +560,9 @@ prompt = PromptTemplate(
 )
 ```
 
-## Lifecycle and State
+## 生命周期与状态
 
-Prompt templates are **immutable** in the functional sense: calling `format()` or `invoke()` does not mutate the template. Methods like `partial()` return new instances.
+提示词模板在函数意义上**不可变**:调用 `format()` 或 `invoke()` 不修改模板。`partial()` 等方法返回新实例。
 
 ```python
 original = PromptTemplate.from_template("Say {text}")
@@ -571,11 +573,11 @@ print(original.input_variables)  # ['text']
 print(partial.input_variables)   # []
 ```
 
-This immutability enables safe composition and caching in pipelines.
+不可变性使管线中的安全组合与缓存成为可能。
 
-## Observability and Tracing
+## 可观测与追踪
 
-All prompts support LangChain's standard tracing and observability hooks:
+所有提示词支持 LangChain 标准追踪与可观测钩子:
 
 ```python
 template = ChatPromptTemplate.from_messages([
@@ -593,4 +595,4 @@ result = template_with_metadata.invoke({"input": "hello"})
 # The invoke is traced with the given metadata
 ```
 
-Metadata and tags are propagated to LangSmith and other observability backends, enabling debugging and performance analysis.
+元数据与标签传播到 LangSmith 等可观测后端,支持调试与性能分析。

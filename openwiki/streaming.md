@@ -22,84 +22,86 @@ sources:
 generated: { by: "openwiki/0.5.0", at: "2026-09-03T15:18:34.589Z" }
 ---
 
-## Overview
+> 🌐 本文档由 [langchain-ai/langchain](https://github.com/langchain-ai/langchain) 翻译,英文原版见原项目。
 
-**Streaming** is the mechanism by which LangChain delivers model output incrementally, token by token, rather than waiting for the entire response. This enables real-time feedback in web UIs, console displays, and other user-facing contexts, and forms the foundation for building responsive applications that do not block on model latency.
+## 总览
 
-Instead of blocking with `invoke()` until a full response is ready, applications call `stream()` or `astream()` and receive a sequence of partial outputs as they arrive from the model. Each chunk is an `AIMessageChunk` carrying delta content. Callbacks intercept these chunks via the `on_llm_new_token` event, making it possible to observe, log, or react to each token without collecting the entire response first.
+**流式(Streaming)**是 LangChain 逐 token 增量交付模型输出的机制,而不是等整段响应。它让 Web UI、控制台等用户界面获得实时反馈,是构建不因模型延迟而阻塞的响应式应用的基础。
 
-Streaming flows through chains—prompts, models, output parsers, and other runnables—preserving incremental output delivery at each stage. By composition, a chain automatically supports streaming if all its components do. This page documents the mechanics of streaming across components, the trade-offs versus non-streaming invoke, and how to integrate streaming into applications.
+应用不调用阻塞的 `invoke()` 等完整响应,而是调用 `stream()` 或 `astream()`,随模型产出逐段接收部分输出。每块是携带增量内容的 `AIMessageChunk`。回调经 `on_llm_new_token` 事件拦截这些块,使你能在不先收集完整响应的情况下观察、记录或响应每个 token。
 
-## Synchronous Streaming: stream()
+流式贯穿链路 —— 提示词、模型、输出解析器等 runnable —— 在每一级保留增量交付。通过组合,只要链上所有组件支持流式,链就自动支持。本页讲清跨组件的流式机制、与非流式 invoke 的权衡,以及如何把流式集成进应用。
 
-**Location**: `repo://libs/core/langchain_core/language_models/chat_models.py#L727-L856`
+## 同步流式:stream()
 
-`BaseChatModel.stream()` is the primary synchronous streaming entry point. It yields `AIMessageChunk` objects as they are produced by the underlying model, with incremental content—a single token, a fragment of JSON, or a structured block update.
+**位置**:`repo://libs/core/langchain_core/language_models/chat_models.py#L727-L856`
 
-### Control Flow
+`BaseChatModel.stream()` 是主要的同步流式入口。它随底层模型产出逐个 yield `AIMessageChunk`,内容为增量 —— 单个 token、JSON 片段或结构化块更新。
 
-1. **Check if streaming is implemented**: `_should_stream()` determines whether the model supports streaming. If not, `stream()` falls back to `invoke()` and yields one complete result.
+### 控制流
 
-2. **Initialize callbacks**: A `CallbackManager` is configured from the provided `RunnableConfig`, binding callbacks, tags, and metadata.
+1. **检查流式是否实现**:`_should_stream()` 判断模型是否支持流式。不支持则 `stream()` 回退到 `invoke()`,只 yield 一个完整结果。
 
-3. **Fire on_chat_model_start**: The callback lifecycle begins with `on_chat_model_start`, signaling that LLM invocation is beginning.
+2. **初始化回调**:由传入的 `RunnableConfig` 配置 `CallbackManager`,绑定回调、标签和元数据。
 
-4. **Iterate model chunks**: For each `ChatGenerationChunk` from the underlying `_stream()` implementation:
-   - The chunk's message ID is set to a unique run ID if not already present.
-   - Response metadata (model provider, latency, etc.) is computed and attached.
-   - **on_llm_new_token is fired** with the chunk's content and the full chunk object, allowing callbacks to observe or buffer each token.
-   - The chunk message is cast to `AIMessageChunk` and yielded immediately.
-   - Chunks are accumulated for later aggregation.
+3. **触发 on_chat_model_start**:回调生命周期从 `on_chat_model_start` 开始,标志 LLM 调用启动。
 
-5. **Yield final "last" chunk**: After the model finishes, if output_version is v1 (content-block format), an empty chunk with `chunk_position="last"` is yielded. This signals to parsers and consumers that the stream is complete and that tool_call_chunks should be finalized.
+4. **迭代模型块**:对底层 `_stream()` 实现产出的每个 `ChatGenerationChunk`:
+   - 块的消息 ID 缺失时设为唯一 run ID。
+   - 计算并附加响应元数据(模型供应商、延迟等)。
+   - **触发 on_llm_new_token**,传入块内容和完整块对象,回调可观察或缓冲每个 token。
+   - 块消息转为 `AIMessageChunk` 并立即 yield。
+   - 块被累积以便后续聚合。
 
-6. **Callback lifecycle closes**: If successful, `on_llm_end` fires with a merged `ChatGeneration` containing all chunks. If an exception occurs, `on_llm_error` fires with partial accumulation.
+5. **yield 最终 "last" 块**:模型结束后,若 output_version 为 v1(内容块格式),会 yield 一个 `chunk_position="last"` 的空块,通知解析器和消费者流已结束、tool_call_chunks 应定稿。
 
-### Fallback Behavior
+6. **回调生命周期收尾**:成功则 `on_llm_end` 携带合并了全部块的 `ChatGeneration` 触发;异常则 `on_llm_error` 携带部分累积触发。
 
-If the model does not implement streaming (checked via `_should_stream(async_api=False)`), `stream()` delegates to `invoke()` and yields a single result cast to `AIMessageChunk`. This ensures all models provide a consistent streaming interface, even if only non-streaming invoke is available.
+### 回退行为
 
-### Rate Limiting
+模型未实现流式时(经 `_should_stream(async_api=False)` 判断),`stream()` 委托给 `invoke()`,把单个结果转为 `AIMessageChunk` yield。这保证所有模型都有一致的流式接口,哪怕只有非流式 invoke。
 
-If a rate limiter is attached to the model, `stream()` acquires a permit before beginning, blocking until the rate limit allows.
+### 限流
 
-## Asynchronous Streaming: astream()
+模型挂了限流器时,`stream()` 在开始前获取许可,阻塞到限流放行。
 
-**Location**: `repo://libs/core/langchain_core/language_models/chat_models.py#L858-L991`
+## 异步流式:astream()
 
-`BaseChatModel.astream()` is the async variant of `stream()`, mirroring the synchronous logic but using async/await and `AsyncCallbackManager`.
+**位置**:`repo://libs/core/langchain_core/language_models/chat_models.py#L858-L991`
 
-**Key differences**:
-- Uses `await` for callback events (`await run_manager.on_llm_new_token(...)`, `await run_manager.on_llm_end(...)`)
-- Iterates via `async for chunk in self._astream(...)`
-- Acquires rate limit via `await self.rate_limiter.aacquire(blocking=True)`
+`BaseChatModel.astream()` 是 `stream()` 的异步变体,镜像同步逻辑但使用 async/await 和 `AsyncCallbackManager`。
 
-The async streaming protocol is identical to sync: yield chunks immediately, fire callbacks per token, finalize tool call chunks on the "last" signal.
+**关键差异**:
+- 回调事件用 `await`(`await run_manager.on_llm_new_token(...)`、`await run_manager.on_llm_end(...)`)
+- 经 `async for chunk in self._astream(...)` 迭代
+- 经 `await self.rate_limiter.aacquire(blocking=True)` 获取限流许可
 
-## AIMessageChunk: Incremental Content
+异步流式协议与同步一致:立即 yield 块、每 token 触发回调、收到 "last" 信号时定稿工具调用块。
 
-**Location**: `repo://libs/core/langchain_core/messages/ai.py#L418-L536`
+## AIMessageChunk:增量内容
 
-`AIMessageChunk` is the message type yielded during streaming. Unlike `AIMessage`, it represents a **partial, incremental update** to a conversation message and supports merging via the `+` operator.
+**位置**:`repo://libs/core/langchain_core/messages/ai.py#L418-L536`
 
-### Structure
+`AIMessageChunk` 是流式期间 yield 的消息类型。与 `AIMessage` 不同,它表示对话消息的**部分增量更新**,并支持用 `+` 运算符合并。
 
-- **content**: String or list of content blocks. During streaming, each chunk contains only the new token(s) or delta for that step.
-- **tool_call_chunks**: List of `ToolCallChunk` objects (incomplete tool calls being streamed). These are progressively updated as arguments arrive.
-- **chunk_position**: Optional sentinel; when set to `"last"`, indicates the final chunk in the stream, triggering finalization of tool calls and reasoning blocks.
-- **response_metadata**: Model-specific metadata (latency, model_provider, usage counters, etc.) attached by the streaming handler.
+### 结构
 
-### Merging and Aggregation
+- **content**:字符串或内容块列表。流式期间每块只含该步骤的新 token 或增量。
+- **tool_call_chunks**:`ToolCallChunk` 对象列表(流式中的不完整工具调用)。参数陆续到达时逐步更新。
+- **chunk_position**:可选哨兵;为 `"last"` 表示流中最后一个块,触发工具调用与推理块的定稿。
+- **response_metadata**:模型专属元数据(延迟、model_provider、用量计数等),由流式处理器附加。
 
-Streaming chunks accumulate via the `+` operator, which merges content, concatenates tool_call arguments, and combines metadata. A complete `AIMessage` with finalized `tool_calls` (not chunks) is reconstructed when chunks are merged or when the "last" signal is received.
+### 合并与聚合
 
-## Callback Integration: on_llm_new_token
+流式块经 `+` 运算符累积:合并内容、拼接 tool_call 参数、合并元数据。块合并完毕或收到 "last" 信号时,重建出 `tool_calls` 已定稿(不再是 chunks)的完整 `AIMessage`。
 
-**Location**: `repo://libs/core/langchain_core/callbacks/base.py#L65-L88`
+## 回调集成:on_llm_new_token
 
-The `on_llm_new_token` callback fires for each token or chunk during streaming, enabling real-time observation and logging.
+**位置**:`repo://libs/core/langchain_core/callbacks/base.py#L65-L88`
 
-### Signature
+`on_llm_new_token` 回调在流式期间每个 token 或块触发,支持实时观察与日志。
+
+### 签名
 
 ```python
 def on_llm_new_token(
@@ -114,11 +116,11 @@ def on_llm_new_token(
 ) -> Any:
 ```
 
-- **token**: The string token or list of content blocks (when output_version="v1").
-- **chunk**: The full `ChatGenerationChunk` carrying metadata, message ID, response metadata, and tool_call_chunks.
-- **run_id**: Unique identifier for this streaming run, used for tracing and correlation.
+- **token**:字符串 token 或内容块列表(output_version="v1" 时)。
+- **chunk**:完整 `ChatGenerationChunk`,携带元数据、消息 ID、响应元数据和 tool_call_chunks。
+- **run_id**:本次流式运行的唯一标识,用于追踪与关联。
 
-### Example: Stream to stdout
+### 示例:流式输出到 stdout
 
 ```python
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
@@ -133,29 +135,29 @@ for chunk in model.stream(
     pass  # callback prints each token to stdout
 ```
 
-The `StreamingStdOutCallbackHandler` implements `on_llm_new_token` to write tokens to `sys.stdout`, making streaming output visible in real-time.
+`StreamingStdOutCallbackHandler` 实现 `on_llm_new_token` 把 token 写入 `sys.stdout`,让流式输出实时可见。
 
-## Streaming Through Chains
+## 贯穿链路的流式
 
-Streaming flows through chains composed of runnables (prompts, models, parsers). The streaming protocol is implemented at each stage via the `stream()` and `transform()` methods on `Runnable`.
+流式流经由 runnable(提示词、模型、解析器)组成的链。流式协议在每一级经 `Runnable` 的 `stream()` 和 `transform()` 方法实现。
 
-### Default Behavior
+### 默认行为
 
-**Location**: `repo://libs/core/langchain_core/runnables/base.py#L1194-L1235`
+**位置**:`repo://libs/core/langchain_core/runnables/base.py#L1194-L1235`
 
-By default, `Runnable.stream()` yields one full output from `invoke()`. Subclasses that support streaming override `stream()` or `transform()` to yield chunks.
+默认情况下,`Runnable.stream()` yield `invoke()` 的一个完整输出。支持流式的子类重写 `stream()` 或 `transform()` 来 yield 块。
 
-### Streaming through RunnableSequence
+### 经 RunnableSequence 流式
 
-**Location**: `repo://libs/core/langchain_core/runnables/base.py#L3075-L3320`
+**位置**:`repo://libs/core/langchain_core/runnables/base.py#L3075-L3320`
 
-`RunnableSequence` (a chain created with the `|` operator) automatically supports streaming if:
-1. **All upstream components implement transform**: The `transform()` method maps streaming input to streaming output.
-2. **The last component produces chunks**: Output parsers and models implement `transform()` to yield partial results.
+`RunnableSequence`(`|` 运算符创建的链)在以下条件时自动支持流式:
+1. **所有上游组件实现 transform**:`transform()` 方法把流式输入映射为流式输出。
+2. **最后组件产出块**:输出解析器和模型实现 `transform()` 来 yield 部分结果。
 
-If any component does not implement `transform()`, streaming begins only after that component completes (blocking point). Multiple blocking components create multiple buffering points, but the final output still streams from the last component if it supports streaming.
+任一组件未实现 `transform()` 时,流式只能在该组件完成后开始(阻塞点)。多个阻塞组件形成多个缓冲点;但只要最后组件支持流式,最终输出仍从那里流式。
 
-### Streaming Example: Model → Parser
+### 流式示例:模型 → 解析器
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -170,37 +172,37 @@ for chunk in chain.stream("What is 2+2?"):
     print(chunk, end="", flush=True)
 ```
 
-When `model.stream()` yields chunks, the parser's `transform()` (or default `stream()`) consumes each chunk and yields its transformation. Text parsers may yield tokens directly; JSON parsers yield partial JSON objects as they become parseable.
+`model.stream()` yield 块时,解析器的 `transform()`(或默认 `stream()`)消费每个块并 yield 其转换结果。文本解析器可直接 yield token;JSON 解析器在可解析时 yield 部分 JSON 对象。
 
-## Streaming via stream_events: ChatModelStream
+## 经 stream_events 流式:ChatModelStream
 
-**Location**: `repo://libs/core/langchain_core/language_models/chat_model_stream.py`
+**位置**:`repo://libs/core/langchain_core/language_models/chat_model_stream.py`
 
-For advanced use cases requiring detailed event granularity, `BaseChatModel.stream_events(version="v3")` returns a `ChatModelStream` object that exposes **typed projection properties** (`.text`, `.tool_calls`, `.usage`, `.reasoning`, `.output`) which accumulate events as they arrive.
+对需要细粒度事件的高级场景,`BaseChatModel.stream_events(version="v3")` 返回 `ChatModelStream` 对象,暴露**类型化投影属性**(`.text`、`.tool_calls`、`.usage`、`.reasoning`、`.output`),随事件到达逐步累积。
 
-This is distinct from simple token streaming and is useful for applications needing structured, event-by-event visibility into reasoning, tool calls, and other protocol events. The `ChatModelStream` also fires `on_stream_event` callbacks for each protocol event, not just tokens.
+这与简单 token 流式不同,适合需要对推理、工具调用等协议事件做结构化逐事件观察的应用。`ChatModelStream` 还对每个协议事件(不只是 token)触发 `on_stream_event` 回调。
 
-## Memory and Latency Trade-offs: stream() vs invoke()
+## 内存与延迟权衡:stream() vs invoke()
 
 ### invoke()
 
-- **Latency**: Waits for the entire model response before returning.
-- **Memory**: No intermediate storage required; only the final message is held.
-- **Responsiveness**: Blocks the calling thread/coroutine until complete.
-- **Use case**: Batch processing, when a complete response is needed upfront.
+- **延迟**:等整个模型响应完成才返回。
+- **内存**:无需中间存储;只持有最终消息。
+- **响应性**:阻塞调用线程/协程直到完成。
+- **场景**:批处理;需要一次性拿到完整响应。
 
 ### stream()
 
-- **Latency**: Yields the first token as soon as available; responsive to user.
-- **Memory**: Requires buffering of accumulated chunks if the caller collects them.
-- **Responsiveness**: Non-blocking; enables progressive display.
-- **Use case**: Web UIs, console applications, user-facing interactions where real-time feedback improves UX.
+- **延迟**:首个 token 一到就产出;对用户即时响应。
+- **内存**:若调用方收集块,需要缓冲累积。
+- **响应性**:非阻塞;支持渐进展示。
+- **场景**:Web UI、控制台应用、重视实时反馈的用户交互。
 
-In practice, streaming does not add significant latency compared to invoke; the model produces tokens at the same rate. The difference is **when tokens are delivered to the caller**. Stream delivery is preferable for interactive applications because users see output appearing in real-time rather than a blank screen until the full response is ready.
+实践中,流式相比 invoke 并不增加显著延迟;模型产 token 的速率相同,区别在于 **token 何时交付给调用方**。交互式应用更适合流式交付 —— 用户看到输出实时出现,而不是盯着空白屏等完整响应。
 
-## Integration Patterns
+## 集成模式
 
-### Real-time Console Output
+### 实时控制台输出
 
 ```python
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
@@ -213,7 +215,7 @@ for _ in model.stream(
     pass  # Tokens are printed as they arrive
 ```
 
-### Accumulate Streamed Output
+### 累积流式输出
 
 ```python
 result = ""
@@ -222,7 +224,7 @@ for chunk in model.stream(messages):
 print(result)  # Final complete response
 ```
 
-### Custom Callback for Application Logic
+### 应用逻辑的自定义回调
 
 ```python
 from langchain_core.callbacks import BaseCallbackHandler
@@ -239,7 +241,7 @@ for _ in model.stream(
     pass
 ```
 
-### Async Streaming in Web Framework
+### Web 框架中的异步流式
 
 ```python
 async def chat_endpoint(messages):
@@ -248,31 +250,31 @@ async def chat_endpoint(messages):
         yield f"data: {chunk.content}\n\n"
 ```
 
-## Lifecycle and Error Handling
+## 生命周期与错误处理
 
-### Successful Stream
+### 成功的流
 
-1. `on_chat_model_start` fires
-2. For each chunk: `on_llm_new_token` fires
-3. `on_llm_end` fires with merged `ChatGeneration`
+1. 触发 `on_chat_model_start`
+2. 每块触发 `on_llm_new_token`
+3. `on_llm_end` 携带合并后的 `ChatGeneration` 触发
 
-### Stream with Error
+### 出错的流
 
-1. `on_chat_model_start` fires
-2. For each chunk before error: `on_llm_new_token` fires
-3. Error occurs in `_stream()` or callback
-4. `on_llm_error` fires with partial chunks aggregated
-5. Exception is re-raised to caller
+1. 触发 `on_chat_model_start`
+2. 出错前的每块触发 `on_llm_new_token`
+3. `_stream()` 或回调中发生错误
+4. `on_llm_error` 携带已聚合的部分块触发
+5. 异常重新抛给调用方
 
-### Cleanup
+### 清理
 
-When a stream exits (via break, exception, or normal completion), any buffered chunks are merged and callbacks finalize the run. Async streaming also closes async generators via `aclose()` if present.
+流退出(break、异常或正常结束)时,缓冲的块被合并,回调完成运行。异步流式还会对存在的异步生成器调用 `aclose()` 收尾。
 
-## Extension Points
+## 扩展点
 
-### Custom Streaming Implementation
+### 自定义流式实现
 
-Subclasses of `BaseChatModel` override `_stream()` and/or `_astream()` to implement model-specific streaming:
+`BaseChatModel` 子类重写 `_stream()` 和/或 `_astream()` 实现模型专属流式:
 
 ```python
 class MyModel(BaseChatModel):
@@ -287,11 +289,11 @@ class MyModel(BaseChatModel):
             yield ChatGenerationChunk(message=AIMessageChunk(content=token))
 ```
 
-The `stream()` method handles callbacks, merging, and lifecycle; subclasses only implement the core streaming loop.
+`stream()` 方法负责回调、合并和生命周期;子类只需实现核心流式循环。
 
-### Custom Output Parser Transform
+### 自定义输出解析器 transform
 
-Output parsers can override `transform()` to stream partial results:
+输出解析器可重写 `transform()` 来流式产出部分结果:
 
 ```python
 class MyParser(BaseGenerationOutputParser[T]):
@@ -309,15 +311,15 @@ class MyParser(BaseGenerationOutputParser[T]):
                 yield partial
 ```
 
-This allows parsers to yield progressively more complete results as tokens arrive.
+解析器因此能在 token 到达时逐步产出更完整的结果。
 
-## Configuration and Operations
+## 配置与运维
 
-### Disabling Streaming
+### 禁用流式
 
-Models respect the `stream=False` parameter or a falsy check in `_should_stream()`. Calling `invoke()` directly bypasses streaming even if the model supports it.
+模型遵循 `stream=False` 参数或 `_should_stream()` 中的假值判断。直接调 `invoke()` 可绕过流式,即使模型支持。
 
-### Configuring Callbacks
+### 配置回调
 
 ```python
 config = RunnableConfig(
@@ -329,11 +331,11 @@ for chunk in model.stream(messages, config=config):
     pass
 ```
 
-Callbacks, tags, and metadata propagate through the callback lifecycle.
+回调、标签和元数据贯穿回调生命周期传播。
 
-### Async Streaming
+### 异步流式
 
-Use `astream()` in async contexts and `await` on async callbacks:
+异步上下文用 `astream()` 并 await 异步回调:
 
 ```python
 async for chunk in model.astream(messages):
@@ -341,6 +343,6 @@ async for chunk in model.astream(messages):
     await handle_chunk(chunk)
 ```
 
-## Conclusion
+## 结语
 
-Streaming is central to building responsive LangChain applications. By yielding output token-by-token and firing callbacks per token, streaming enables real-time user feedback without sacrificing performance. The protocol is consistent across models, chains, and parsers, making it easy to compose streaming operations and observe output at any level of the application stack.
+流式是构建响应式 LangChain 应用的核心。逐 token 产出并对每个 token 触发回调,流式在不牺牲性能的前提下带来实时用户反馈。协议在模型、链、解析器之间保持一致,让流式操作易于组合,并可在应用栈任意层级观察输出。
